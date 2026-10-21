@@ -264,5 +264,82 @@ gltf("wooden_bowl_01", (KX1 - 0.3, -0.05), fit_w=0.3, z=wtz)
 gltf("potted_plant_04", (KX1 - 0.25, run_y0 + 0.25), fit_h=0.32, z=wtz)
 gltf("ceramic_vase_01", (KX1 - 0.18, 1.0), fit_h=0.3, z=wtz)
 
+# ======================================================================== personal touches
+L_DIR = os.path.join(ROOT, "labels")
+def img_mat(name, path, rough=0.35):
+    m = bpy.data.materials.get(name) or bpy.data.materials.new(name)
+    m.use_nodes = True; nt = m.node_tree; nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputMaterial"); b = nt.nodes.new("ShaderNodeBsdfPrincipled"); nt.links.new(b.outputs[0], out.inputs[0])
+    t = nt.nodes.new("ShaderNodeTexImage"); t.image = bpy.data.images.load(path, check_existing=True); t.extension = "EXTEND"
+    nt.links.new(t.outputs[0], b.inputs["Base Color"]); b.inputs["Roughness"].default_value = rough
+    return m
+
+def place(objs, loc, rz):
+    """objs were built at the origin facing -Y; turn them by rz and move them to loc."""
+    bpy.context.view_layer.update()
+    M_ = Matrix.Translation(Vector(loc)) @ Matrix.Rotation(rz, 4, "Z")
+    for o in objs: o.matrix_world = M_ @ o.matrix_world
+
+def picture(name, img, w, h, loc, rz, frame=0.018, mount=0.035, depth=0.022, frame_m=None, tilt=0.0):
+    """A framed photo with a white mount, front facing -Y before rz. loc = centre of its back."""
+    frame_m = frame_m or flat("Frame_black", (0.02, 0.02, 0.02), 0.4)
+    mount_m = flat("Frame_mount", (0.82, 0.81, 0.78), 0.8)
+    W_, H_ = w + 2 * (mount + frame), h + 2 * (mount + frame)
+    objs = [box(f"{name}_back", (W_ - 2 * frame, 0.004, H_ - 2 * frame), (0, -0.004, 0), mount_m)]
+    for nm_, size, c in (("t", (W_, depth, frame), (0, -depth / 2, H_ / 2 - frame / 2)), ("b", (W_, depth, frame), (0, -depth / 2, -H_ / 2 + frame / 2)),
+                         ("l", (frame, depth, H_), (-W_ / 2 + frame / 2, -depth / 2, 0)), ("r", (frame, depth, H_), (W_ / 2 - frame / 2, -depth / 2, 0))):
+        objs.append(box(f"{name}_frame_{nm_}", size, c, frame_m))
+    me = bpy.data.meshes.new(name + "_photo")
+    me.from_pydata([(-w / 2, -0.007, -h / 2), (w / 2, -0.007, -h / 2), (w / 2, -0.007, h / 2), (-w / 2, -0.007, h / 2)], [], [(0, 1, 2, 3)])
+    uv = me.uv_layers.new()
+    for li, (u, v) in zip(range(4), ((0, 0), (1, 0), (1, 1), (0, 1))): uv.data[li].uv = (u, v)
+    me.materials.append(img_mat(f"Photo_{os.path.basename(img)}", img))
+    ph = bpy.data.objects.new(name + "_photo", me); coll.objects.link(ph); objs.append(ph)
+    bpy.context.view_layer.update()
+    if tilt:                                                  # standing frames lean back a little
+        for o in objs: o.matrix_world = Matrix.Rotation(tilt, 4, "X") @ o.matrix_world
+    place(objs, loc, rz); bpy.context.view_layer.update()
+    return objs
+
+photos = [os.path.join(L_DIR, f"photo_{k}.jpg") for k in range(1, 6)]
+
+# Jamie's panoramic canvas above the sofa (on the recess back wall, facing into the room)
+pano_img = os.path.join(L_DIR, "panorama_monument_valley.jpg")
+CW, CH, CD = 1.85, 0.5, 0.035
+canvas_edge = flat("Canvas_edge", (0.25, 0.12, 0.06), 0.8)
+cv = [box("Pano_canvas_body", (CW, CD, CH), (0, -CD / 2, 0), canvas_edge)]
+me = bpy.data.meshes.new("Pano_canvas_face")
+me.from_pydata([(-CW / 2, -CD - 0.0005, -CH / 2), (CW / 2, -CD - 0.0005, -CH / 2), (CW / 2, -CD - 0.0005, CH / 2), (-CW / 2, -CD - 0.0005, CH / 2)], [], [(0, 1, 2, 3)])
+uvl = me.uv_layers.new()
+for li, (u, v) in zip(range(4), ((0, 0), (1, 0), (1, 1), (0, 1))): uvl.data[li].uv = (u, v)
+me.materials.append(img_mat("Pano_canvas_print", pano_img, 0.7))
+cf = bpy.data.objects.new("Pano_canvas_face", me); coll.objects.link(cf); cv.append(cf)
+bpy.context.view_layer.update()
+place(cv, (-2.05, Y0 - SOFA_D, 1.42), math.pi)
+
+# wall-mounted TV opposite the sofa (north wall, west of Glenda's alcove), console on a floating shelf
+TVX = -2.05
+tv_glass = flat("TV_screen", (0.005, 0.005, 0.006), 0.04, coat=1.0)
+tv_body = flat("TV_body", (0.02, 0.02, 0.022), 0.35, 0.5)
+tv = [box("TV_body", (1.24, 0.03, 0.72), (0, -0.045, 0), tv_body),
+      box("TV_screen", (1.22, 0.004, 0.69), (0, -0.0615, 0.01), tv_glass),
+      box("TV_bracket", (0.3, 0.03, 0.2), (0, -0.015, 0), tv_body)]
+place(tv, (TVX, Y1, 1.28), 0.0)
+shelf_m = bpy.data.materials.get("Modern_oak")
+box("Media_shelf", (1.3, 0.3, 0.04), (TVX, Y1 - 0.15, 0.48), shelf_m)
+pc = gltf("gaming_console", (TVX - 0.3, Y1 - 0.15), rot_z=0.0, fit_w=0.32, z=0.50)
+box("Console_cable", (0.006, 0.006, 0.75), (TVX - 0.05, Y1 - 0.004, 0.86), tv_body)        # neat cable run up to the TV
+
+# family photos: a gallery on the north wall east of the alcove, plus standing frames on the sideboard and side table
+GX = 2.2
+picture("Gallery_1", photos[0], 0.24, 0.30, (GX - 0.5, Y1, 1.45), 0.0)
+picture("Gallery_2", photos[1], 0.39, 0.26, (GX + 0.02, Y1, 1.55), 0.0)
+picture("Gallery_3", photos[2], 0.24, 0.30, (GX + 0.54, Y1, 1.45), 0.0)
+picture("Gallery_4", photos[3], 0.33, 0.22, (GX + 0.02, Y1, 1.23), 0.0)
+picture("Desk_photo_1", photos[4], 0.13, 0.13, (wx + 0.3, -1.6, sbt + 0.11), math.pi / 2, frame=0.012, mount=0.02, depth=0.015, tilt=math.radians(-10),
+        frame_m=bpy.data.materials.get("Modern_oak"))
+picture("Desk_photo_2", photos[3], 0.15, 0.10, (wx + 0.3, -0.85, sbt + 0.09), math.pi / 2 - 0.25, frame=0.012, mount=0.02, depth=0.015, tilt=math.radians(-10))
+picture("Side_photo", photos[0], 0.10, 0.13, (0.95, ay + 0.3, top_of(st) + 0.1), 0.15, frame=0.012, mount=0.018, depth=0.015, tilt=math.radians(-10))
+
 win.scene = prev_scene
 print("ModernFurnished built:", len(coll.all_objects), "furniture/kitchen objects; render ->", OUT)
