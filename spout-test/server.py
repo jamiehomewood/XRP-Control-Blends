@@ -124,6 +124,11 @@ class Handler(SimpleHTTPRequestHandler):
             try: log_answer(data)
             except OSError as e: print("could not write the answer log:", e)
             return self._json({"ok": True})
+        if self.path.startswith("/api/shutdown"):                     # used by stop-room.bat (this PC only)
+            if self.client_address[0] not in ("127.0.0.1", "::1"): return self._json({"error": "local only"}, 403)
+            print("[server] shutting down (stop-room.bat)")
+            threading.Thread(target=self.server.shutdown, daemon=True).start()
+            return self._json({"ok": True})
         if self.path.startswith("/api/scene"):
             sid = str(data.get("id", ""))
             if not any(x["id"] == sid for x in load_scenes()): return self._json({"error": "unknown scene"}, 400)

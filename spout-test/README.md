@@ -9,6 +9,16 @@
    - tick "Control audio via OBS" if you want her voice to go through OBS; leave it unticked to play through the PC's speakers
 3. Go to **Tools → Spout Output Settings** and start sending as `GlendaScene`, then select that sender in IglooPreview or the room.
 
+### One-click start and stop (OBS + Spout route)
+
+- **`start-room.bat`** starts the scene server (if it isn't already running) and OBS, minimised. `start-room.bat modern` also picks the first scene. Add it to an Igloo Core Engine layer to launch everything from there.
+- **`stop-room.bat`** closes OBS (forcing it after 10 s if it hangs) and stops the scene server.
+
+One-time OBS setup on that PC:
+1. The Browser source URL is `http://localhost:8000/stage.html`, so the remote's scene buttons control what OBS sends. The size is 4096 × 2048.
+2. Go to **Tools → Spout Output Settings**, set the sender name, and tick **AutoStart** so OBS sends over Spout as soon as it opens.
+3. If OBS isn't in `C:\Program Files\obs-studio`, edit `OBS_DIR` at the top of `start-room.bat`.
+
 ### Switching scenes from the remote (Igloo Core Engine)
 
 Load **`http://localhost:8000/stage.html`** in the Igloo web layer (4096 × 2048, Dynamic Resolution off) instead of a particular scene. On the remote, open **Facilitator controls → Scene in the room** and tap a scene; the room fades over to it within a second. The current scene is shown under the title on every phone.
