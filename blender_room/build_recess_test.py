@@ -353,14 +353,15 @@ quad("RShell_bottom", [(SX0, SY1, SZ0), (SX1, SY1, SZ0), (SX1, SY0, SZ0), (SX0, 
 quad("RShell_n", [(SX1, SY1, SZ0), (SX0, SY1, SZ0), (SX0, SY1, SZ1), (SX1, SY1, SZ1)], shell_m)
 quad("RShell_s", [(SX0, SY0, SZ0), (SX1, SY0, SZ0), (SX1, SY0, SZ1), (SX0, SY0, SZ1)], shell_m)
 quad("RShell_e", [(SX1, SY0, SZ0), (SX1, SY1, SZ0), (SX1, SY1, SZ1), (SX1, SY0, SZ1)], shell_m)
-for nm_, (ya, yb, za, zb) in {"a": (SY0, wy0, SZ0, SZ1), "b": (wy1, SY1, SZ0, SZ1), "c": (wy0, wy1, SZ0, WIN_SILL), "d": (wy0, wy1, WIN_SILL + WIN_H, SZ1)}.items():
-    quad(f"RShell_w_{nm_}", [(SX0, yb, za), (SX0, ya, za), (SX0, ya, zb), (SX0, yb, zb)], shell_m)
 T = 0.25
+# the modern rooms look out on a garden, so their shell is left open to the west (the room walls are closed)
+for nm_, (ya, yb, za, zb) in ({} if MODERN else {"a": (SY0, wy0, SZ0, SZ1), "b": (wy1, SY1, SZ0, SZ1), "c": (wy0, wy1, SZ0, WIN_SILL), "d": (wy0, wy1, WIN_SILL + WIN_H, SZ1)}).items():
+    quad(f"RShell_w_{nm_}", [(SX0, yb, za), (SX0, ya, za), (SX0, ya, zb), (SX0, yb, zb)], shell_m)
 for nm_, p in {"t": [(SX0, wy1, WIN_SILL + WIN_H), (X0 - T, wy1, WIN_SILL + WIN_H), (X0 - T, wy0, WIN_SILL + WIN_H), (SX0, wy0, WIN_SILL + WIN_H)],
                "b": [(X0 - T, wy1, WIN_SILL), (SX0, wy1, WIN_SILL), (SX0, wy0, WIN_SILL), (X0 - T, wy0, WIN_SILL)],
                "n": [(X0 - T, wy1, WIN_SILL), (X0 - T, wy1, WIN_SILL + WIN_H), (SX0, wy1, WIN_SILL + WIN_H), (SX0, wy1, WIN_SILL)],
                "s": [(SX0, wy0, WIN_SILL), (SX0, wy0, WIN_SILL + WIN_H), (X0 - T, wy0, WIN_SILL + WIN_H), (X0 - T, wy0, WIN_SILL)]}.items():
-    quad(f"RShell_win_{nm_}", p, reveal)
+    if not MODERN: quad(f"RShell_win_{nm_}", p, reveal)
 
 # ---- hallway beyond the open door --------------------------------------------------------------
 hall_paint = bpy.data.materials.get(STYLE + "_hall_paint") or bpy.data.materials.new(STYLE + "_hall_paint")
@@ -422,6 +423,103 @@ for o in list(bpy.data.collections["Room"].all_objects):
         coll.objects.link(c)
     elif o.name.startswith("Radiator_pipe"):
         c = o.copy(); c.name = "RC_" + o.name; c["recess_test"] = True; coll.objects.link(c)
+
+# ---- modern: radiator, venetian blinds and a little garden outside the window ------------------
+if MODERN:
+    white = flat("Modern_radiator", (0.8, 0.8, 0.79), 0.3)
+    groove = flat("Modern_radiator_groove", (0.55, 0.55, 0.54), 0.5)
+    chrome = flat("Modern_chrome", (0.8, 0.8, 0.8), 0.08, 1.0)
+    # short flat-panel radiator, wall-mounted under the window
+    RX, RW, RZ0, RZ1 = X0 + 0.055, 1.0, 0.14, 0.55
+    box("RRad_panel", (0.05, RW, RZ1 - RZ0), (RX, WIN_Y, (RZ0 + RZ1) / 2), white)
+    for k in range(1, 7):
+        box(f"RRad_groove_{k}", (0.002, RW - 0.04, 0.004), (RX + 0.0255, WIN_Y, RZ0 + (RZ1 - RZ0) * k / 7), groove)
+    for nm_, yv in (("l", WIN_Y - RW / 2 + 0.04), ("r", WIN_Y + RW / 2 - 0.04)):
+        bpy.ops.mesh.primitive_cylinder_add(radius=0.012, depth=0.12, location=(RX, yv, RZ0 - 0.06))
+        v = bpy.context.active_object; v.name = f"RRad_valve_{nm_}"; v.data.materials.append(chrome); v["recess_test"] = True
+        for c in list(v.users_collection): c.objects.unlink(v)
+        coll.objects.link(v)
+
+    # white venetian blind (50 mm slats), part lowered, slats tilted open
+    blind_m = flat("Modern_blind", (0.82, 0.82, 0.8), 0.45)
+    BX = X0 - 0.03
+    WTOP = WIN_SILL + WIN_H
+    box("RBlind_headrail", (0.05, WIN_W - 0.02, 0.035), (BX, WIN_Y, WTOP - 0.02), blind_m)
+    z_ = WTOP - 0.06; k = 0
+    while z_ > WIN_SILL + WIN_H * 0.45:
+        sl = box(f"RBlind_slat_{k}", (0.05, WIN_W - 0.03, 0.002), (BX, WIN_Y, z_), blind_m)
+        sl.rotation_euler = (0, math.radians(35), 0); z_ -= 0.042; k += 1
+    box("RBlind_bottomrail", (0.05, WIN_W - 0.03, 0.012), (BX, WIN_Y, z_), blind_m)
+    for nm_, yv in (("l", WIN_Y - WIN_W / 2 + 0.12), ("r", WIN_Y + WIN_W / 2 - 0.12)):
+        box(f"RBlind_cord_{nm_}", (0.002, 0.002, WTOP - z_), (BX, yv, (WTOP + z_) / 2), blind_m)
+
+    # garden: stone patio, timber planters with plants, a bistro set (the lawn, fence and houses are the main scene's)
+    slab = bpy.data.materials.get("Garden_slab") or bpy.data.materials.new("Garden_slab")
+    slab.use_nodes = True; nt = slab.node_tree; nt.nodes.clear()
+    out_ = nt.nodes.new("ShaderNodeOutputMaterial"); b_ = nt.nodes.new("ShaderNodeBsdfPrincipled"); nt.links.new(b_.outputs[0], out_.inputs[0])
+    tc_ = nt.nodes.new("ShaderNodeTexCoord"); br_ = nt.nodes.new("ShaderNodeTexBrick"); nt.links.new(tc_.outputs["Object"], br_.inputs["Vector"])
+    br_.offset = 0.5; br_.inputs["Scale"].default_value = 1 / 0.6; br_.inputs["Brick Width"].default_value = 1.0; br_.inputs["Row Height"].default_value = 1.0
+    br_.inputs["Mortar Size"].default_value = 0.01
+    br_.inputs["Color1"].default_value = (0.42, 0.40, 0.36, 1); br_.inputs["Color2"].default_value = (0.36, 0.35, 0.32, 1); br_.inputs["Mortar"].default_value = (0.2, 0.2, 0.19, 1)
+    nt.links.new(br_.outputs["Color"], b_.inputs["Base Color"]); b_.inputs["Roughness"].default_value = 0.85
+    timber = flat("Garden_timber", (0.16, 0.10, 0.06), 0.8)
+    soil = flat("Garden_soil", (0.05, 0.035, 0.025), 1.0)
+    metal = flat("Garden_metal", (0.02, 0.02, 0.02), 0.45, 0.6)
+    PX0, PX1, PY0, PY1, PZ = X0 - T - 2.4, X0 - T, -2.2, 3.2, -0.14
+    box("RGarden_patio", (PX1 - PX0, PY1 - PY0, 0.16), ((PX0 + PX1) / 2, (PY0 + PY1) / 2, PZ - 0.08), slab)
+    grass = bpy.data.materials.get("Garden_grass") or bpy.data.materials.new("Garden_grass")
+    grass.use_nodes = True; nt = grass.node_tree; nt.nodes.clear()
+    out_ = nt.nodes.new("ShaderNodeOutputMaterial"); b_ = nt.nodes.new("ShaderNodeBsdfPrincipled"); nt.links.new(b_.outputs[0], out_.inputs[0])
+    tc_ = nt.nodes.new("ShaderNodeTexCoord")
+    n1 = nt.nodes.new("ShaderNodeTexNoise"); n1.inputs["Scale"].default_value = 60; n1.inputs["Detail"].default_value = 6
+    n2 = nt.nodes.new("ShaderNodeTexNoise"); n2.inputs["Scale"].default_value = 0.6; n2.inputs["Detail"].default_value = 2
+    for n_ in (n1, n2): nt.links.new(tc_.outputs["Object"], n_.inputs["Vector"])
+    mix_ = nt.nodes.new("ShaderNodeMath"); mix_.operation = "MULTIPLY"; nt.links.new(n1.outputs["Fac"], mix_.inputs[0]); nt.links.new(n2.outputs["Fac"], mix_.inputs[1])
+    ramp_ = nt.nodes.new("ShaderNodeValToRGB"); nt.links.new(mix_.outputs[0], ramp_.inputs[0])
+    ramp_.color_ramp.elements[0].position = 0.1; ramp_.color_ramp.elements[0].color = (0.03, 0.07, 0.015, 1)
+    ramp_.color_ramp.elements[1].position = 0.45; ramp_.color_ramp.elements[1].color = (0.12, 0.2, 0.04, 1)
+    nt.links.new(ramp_.outputs[0], b_.inputs["Base Color"]); b_.inputs["Roughness"].default_value = 0.9
+    bump_ = nt.nodes.new("ShaderNodeBump"); bump_.inputs["Strength"].default_value = 0.6; nt.links.new(n1.outputs["Fac"], bump_.inputs["Height"]); nt.links.new(bump_.outputs[0], b_.inputs["Normal"])
+    box("RGarden_lawn", (5.6, 13.0, 0.02), ((X0 - T - 9.0) / 2 - 0.15, 0.5, -0.29), grass)
+    def planter(nm, x, y, w, d, h):
+        box(f"RGarden_{nm}", (w, d, h), (x, y, PZ + h / 2), timber)
+        box(f"RGarden_{nm}_soil", (w - 0.06, d - 0.06, 0.02), (x, y, PZ + h - 0.02), soil)
+        return PZ + h - 0.01
+    def plant(name, x, y, z, h):
+        path = os.path.join(ROOT, "assets", "models", name, f"{name}.gltf")
+        if not os.path.exists(path): return
+        before = set(bpy.data.objects); bpy.ops.import_scene.gltf(filepath=path)
+        new = [o for o in bpy.data.objects if o not in before]
+        root = bpy.data.objects.new(f"RGarden_{name}_root", None); root["recess_test"] = True; coll.objects.link(root)
+        for o in new:
+            for c in list(o.users_collection): c.objects.unlink(o)
+            coll.objects.link(o); o["recess_test"] = True
+            if o.parent is None: o.parent = root
+        bpy.context.view_layer.update()
+        pts = [o.matrix_world @ Vector(c) for o in new if o.type == "MESH" for c in o.bound_box]
+        mn = Vector((min(p.x for p in pts), min(p.y for p in pts), min(p.z for p in pts))); mx = Vector((max(p.x for p in pts), max(p.y for p in pts), max(p.z for p in pts)))
+        ctr = (mn + mx) / 2
+        for o in new:
+            if o.parent is root: o.location -= Vector((ctr.x, ctr.y, mn.z))
+        s_ = h / (mx.z - mn.z); root.scale = (s_, s_, s_); root.location = (x, y, z)
+    zt = planter("planter_a", PX0 + 0.35, -0.6, 0.5, 1.4, 0.45)
+    plant("potted_plant_02", PX0 + 0.35, -1.0, zt, 0.55); plant("potted_plant_01", PX0 + 0.35, -0.2, zt, 0.75)
+    zt = planter("planter_b", PX0 + 0.35, 2.0, 0.5, 1.4, 0.45)
+    plant("potted_plant_01", PX0 + 0.35, 1.6, zt, 0.8); plant("potted_plant_04", PX0 + 0.35, 2.4, zt, 0.35)
+    plant("potted_plant_02", PX1 - 0.3, -1.7, PZ, 0.7); plant("potted_plant_04", PX1 - 0.25, 2.75, PZ, 0.4)
+    # bistro table and two chairs
+    TXc, TYc = PX0 + 1.3, 0.55
+    for o_ in (("RGarden_table_top", 0.32, 0.02, (TXc, TYc, PZ + 0.72)), ("RGarden_table_stem", 0.025, 0.7, (TXc, TYc, PZ + 0.36)), ("RGarden_table_foot", 0.22, 0.015, (TXc, TYc, PZ + 0.008))):
+        bpy.ops.mesh.primitive_cylinder_add(radius=o_[1], depth=o_[2], location=o_[3], vertices=40)
+        c_ = bpy.context.active_object; c_.name = o_[0]; c_.data.materials.append(metal); c_["recess_test"] = True
+        for c in list(c_.users_collection): c.objects.unlink(c_)
+        coll.objects.link(c_)
+    for k, dy in enumerate((-0.55, 0.55)):
+        cy = TYc + dy; sgn = 1 if dy > 0 else -1
+        box(f"RGarden_chair_seat_{k}", (0.4, 0.4, 0.025), (TXc, cy, PZ + 0.45), metal)
+        box(f"RGarden_chair_back_{k}", (0.4, 0.025, 0.42), (TXc, cy + sgn * 0.19, PZ + 0.66), metal)
+        for j, (ex, ey) in enumerate(((-0.18, -0.18), (0.18, -0.18), (-0.18, 0.18), (0.18, 0.18))):
+            box(f"RGarden_chair_leg_{k}_{j}", (0.02, 0.02, 0.45), (TXc + ex, cy + ey, PZ + 0.225), metal)
 
 # ---- modern finish: flush white door (open into the hall) and recessed downlights instead of the pendant ---
 if MODERN:
