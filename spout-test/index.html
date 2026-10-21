@@ -140,6 +140,7 @@ loader.loadAsync(P.get('glenda') ? `assets/${P.get('glenda')}` : ROOM.glenda).th
   addMouthShadow(o);
   // remember the resting rotation of the face bones we drive by hand, so the offsets never accumulate
   for (const n of FACE_BONES) if (B[n]) baseQ[n] = B[n].quaternion.clone();
+  initLook();
   glendaReady = true;
   console.log('glenda loaded; clips:', g.animations.map(c => c.name + ' ' + c.duration.toFixed(1) + 's').join(', '),
               '; face bones:', FACE_BONES.map(n => n + (B[n] ? ' ok' : ' MISSING')).join(', '));
@@ -188,7 +189,45 @@ let nextBlink = 2, blinkT = -1, talkEnv = 0, wasTalking = false;
 const JAW_SIGN = parseFloat(P.get('jawsign') || '1');
 const JAW_OPEN = parseFloat(P.get('jawopen') || '0.12');   // radians at full loudness (was 0.22: far too wide)
 const LID_SIGN = parseFloat(P.get('lidsign') || '1');
+// ---------- look at the room ----------
+// While she talks she turns her head (and a little of her neck) to face the middle of the room, where the
+// students stand; when quiet she mostly follows the idle clip. The clip's small nods and tilts stay on top.
+const LOOK_TALK = parseFloat(P.get('look') || '1.0'), LOOK_IDLE = parseFloat(P.get('lookidle') || '0.6');
+const faceLocal = new Map(); let lookW = 0;
+const _q1 = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
+function initLook() {
+  // at rest her face points the way the room centre is from where she sits; remember that direction in each
+  // bone's own frame
+  for (const bone of [B.neck02 || B.neck01, B.head]) {
+    if (!bone) continue;
+    bone.updateWorldMatrix(true, false);
+    const hp = bone.getWorldPosition(_v1);
+    const toCentre = _v2.set(EYE_POS.x - hp.x, 0, EYE_POS.z - hp.z).normalize();
+    faceLocal.set(bone, toCentre.clone().applyQuaternion(bone.getWorldQuaternion(_q1).invert()));
+  }
+}
+function aimBone(bone, w) {
+  if (!bone || w <= 0 || !faceLocal.has(bone)) return;
+  bone.updateWorldMatrix(true, false);
+  const wq = bone.getWorldQuaternion(_q1);
+  const cur = _v1.copy(faceLocal.get(bone)).applyQuaternion(wq);
+  const want = _v2.copy(EYE_POS).sub(bone.getWorldPosition(_v3)).normalize();
+  const delta = _q2.setFromUnitVectors(cur, want);
+  const target = delta.multiply(wq);                              // world rotation that looks at the centre
+  const parentQ = bone.parent.getWorldQuaternion(new THREE.Quaternion());
+  const local = parentQ.invert().multiply(target);
+  bone.quaternion.slerp(local, w);
+}
+function lookAtRoom(dt, talkingNow) {
+  if (!faceLocal.size) return;
+  const goal = talkingNow ? LOOK_TALK : LOOK_IDLE;
+  lookW += (goal - lookW) * Math.min(1, dt * 2.5);               // ease in/out over about half a second
+  aimBone(B.neck02 || B.neck01, lookW * 0.35);
+  aimBone(B.head, lookW);
+}
+
 function animate(t, dt) {
+  lookAtRoom(dt, talking());
   // switch body clips: talking while her audio plays, idle otherwise, an arm rub every minute or so
   const tk = talking();
   if (tk && !wasTalking) crossTo(CLIPS.Talking, 0.5);
