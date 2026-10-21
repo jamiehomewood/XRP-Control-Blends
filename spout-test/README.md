@@ -9,6 +9,18 @@
    - tick "Control audio via OBS" if you want her voice to go through OBS; leave it unticked to play through the PC's speakers
 3. Go to **Tools → Spout Output Settings** and start sending as `GlendaScene`, then select that sender in IglooPreview or the room.
 
+### Switching scenes from the remote (Igloo Core Engine)
+
+Load **`http://localhost:8000/stage.html`** in the Igloo web layer (4096 × 2048, Dynamic Resolution off) instead of a particular scene. On the remote, open **Facilitator controls → Scene in the room** and tap a scene; the room fades over to it within a second. The current scene is shown under the title on every phone.
+
+The scene list is `scenes.json` (id, label, url). Add a line to add a scene; no restart needed:
+
+```json
+{ "id": "modern", "label": "Empty room – modern", "url": "modern_room.html" }
+```
+
+`stage.html?scene=modern` starts the room on a particular scene.
+
 ### Talking to her (Yes / No branching)
 
 **Remote control (recommended):** everyone in the room can use their own phone. On the same Wi-Fi, open the address the server window prints, e.g. `http://192.168.1.20:8000/control.html` (on the PC itself: `http://localhost:8000/control.html`).

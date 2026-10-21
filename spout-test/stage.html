@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Glenda stage</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #000;
+           opacity: 0; transition: opacity .8s ease; }
+  iframe.on { opacity: 1; }
+  #msg { position: absolute; left: 12px; bottom: 10px; font: 14px system-ui, sans-serif; color: #888; }
+</style>
+</head>
+<body>
+<!-- Load THIS page in the Igloo web layer (4096 x 2048). It shows whichever scene the facilitator picks on the
+     remote (control.html -> Facilitator controls -> Scene). The scene list is scenes.json.
+     Open stage.html?scene=modern to start on a particular scene. -->
+<div id="msg">Waiting for the scene server…</div>
+<script>
+  let shown = null, front = null;
+  const startScene = new URLSearchParams(location.search).get('scene');
+  let first = true;
+
+  function show(id, url) {
+    if (id === shown) return;
+    shown = id;
+    document.getElementById('msg').textContent = '';
+    const f = document.createElement('iframe');
+    f.allow = 'autoplay; fullscreen';
+    f.addEventListener('load', () => {
+      requestAnimationFrame(() => f.classList.add('on'));
+      const old = front; front = f;
+      if (old) setTimeout(() => { old.src = 'about:blank'; old.remove(); }, 900);   // stop the old scene (and its audio)
+    }, { once: true });
+    f.src = url;
+    document.body.appendChild(f);
+  }
+
+  async function poll() {
+    try {
+      const d = await (await fetch('/api/scenes?stage=1', { cache: 'no-store' })).json();
+      if (first && startScene && startScene !== d.current && d.scenes.some(s => s.id === startScene)) {
+        await fetch('/api/scene', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: startScene, name: 'stage' }) });
+        d.current = startScene; d.url = d.scenes.find(s => s.id === startScene).url;
+      }
+      first = false;
+      if (d.current && d.url) show(d.current, d.url);
+    } catch (e) {
+      if (!shown) document.getElementById('msg').textContent = 'Scene server not reachable – is start-server.bat running?';
+    }
+    setTimeout(poll, 500);
+  }
+  poll();
+</script>
+</body>
+</html>

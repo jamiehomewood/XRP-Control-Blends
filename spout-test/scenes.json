@@ -1,0 +1,6 @@
+[
+  { "id": "glenda",  "label": "Glenda – home visit",          "url": "index.html" },
+  { "id": "recess",  "label": "Empty room – recesses (dated)", "url": "recess_test.html" },
+  { "id": "modern",  "label": "Empty room – modern",           "url": "modern_room.html" },
+  { "id": "blank",   "label": "Blank (black)",                 "url": "about:blank" }
+]

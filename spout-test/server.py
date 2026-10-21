@@ -21,6 +21,24 @@ commands = []          # [{"id": n, "cmd": "yes", "t": time}]
 next_id = 1
 scene_state = {"node": None, "status": "not connected", "ask": "", "text": "", "updated": 0}
 people = {}            # client id -> {"name": ..., "seen": time}   (remotes check in every poll)
+SCENES_FILE = os.path.join(ROOT, "scenes.json")
+stage = {"current": None, "seen": 0}   # which scene stage.html (the page loaded in the Igloo) should show
+
+
+def load_scenes():
+    """scenes.json is read on every request, so it can be edited while the server runs."""
+    try:
+        with open(SCENES_FILE, encoding="utf-8") as f: return json.load(f)
+    except (OSError, ValueError) as e:
+        print("could not read scenes.json:", e); return []
+
+
+def stage_info():
+    scenes = load_scenes()
+    cur = stage["current"] or (scenes[0]["id"] if scenes else None)
+    sc = next((x for x in scenes if x["id"] == cur), None)
+    return {"current": cur, "label": sc["label"] if sc else "", "url": sc["url"] if sc else "",
+            "connected": time.time() - stage["seen"] < 5}
 LOG_DIR = os.path.join(ROOT, "sessions")
 
 
@@ -73,6 +91,10 @@ class Handler(SimpleHTTPRequestHandler):
                 out = [c for c in commands if c["id"] > since]
                 latest = commands[-1]["id"] if commands else 0
             return self._json({"commands": out, "latest": latest})
+        if self.path.startswith("/api/scenes"):
+            with lock:
+                if "stage=1" in self.path: stage["seen"] = time.time()      # stage.html checking in
+                return self._json({"scenes": load_scenes(), **stage_info()})
         if self.path.startswith("/api/state"):
             q = parse_qs(urlparse(self.path).query)
             cid, name = q.get("client", [""])[0][:40], q.get("name", [""])[0].strip()[:30]
@@ -80,7 +102,7 @@ class Handler(SimpleHTTPRequestHandler):
                 if cid:
                     if cid not in people and name: print(f"[join] {name}")
                     people[cid] = {"name": name, "seen": time.time()}
-                return self._json({**scene_state, "people": online()})
+                return self._json({**scene_state, "people": online(), "stage": stage_info()})
         return super().do_GET()
 
     def do_POST(self):
@@ -101,6 +123,12 @@ class Handler(SimpleHTTPRequestHandler):
             print(f"[answer] {data.get('who')} said {data.get('answer')} to \"{data.get('ask')}\"")
             try: log_answer(data)
             except OSError as e: print("could not write the answer log:", e)
+            return self._json({"ok": True})
+        if self.path.startswith("/api/scene"):
+            sid = str(data.get("id", ""))
+            if not any(x["id"] == sid for x in load_scenes()): return self._json({"error": "unknown scene"}, 400)
+            with lock: stage["current"] = sid
+            print(f"[scene] {data.get('name') or 'Someone'} switched to {sid}")
             return self._json({"ok": True})
         if self.path.startswith("/api/state"):
             with lock:
@@ -133,6 +161,7 @@ if __name__ == "__main__":
         print(f"NOTE: using port {PORT}, so change the OBS Browser source URL to match.")
     ip = lan_ip()
     print("Glenda scene server running.")
+    print(f"  Igloo web layer:     http://localhost:{PORT}/stage.html   (shows the scene picked on the remote)")
     print(f"  OBS Browser source:  http://localhost:{PORT}/index.html")
     print(f"  Remote control:      http://{ip}:{PORT}/control.html   (phone/tablet on the same Wi-Fi)")
     print(f"                       http://localhost:{PORT}/control.html  (on this PC)")

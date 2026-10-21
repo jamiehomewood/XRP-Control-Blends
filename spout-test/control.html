@@ -39,6 +39,9 @@
   ol li span { color: var(--text); }
   details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
   footer { font-size: 12px; color: var(--muted); }
+  .scenes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .scenes button { background: var(--neutral); font-size: 15px; padding: 14px 6px; }
+  .scenes button.current { background: var(--accent); color: #14171c; }
   /* join screen */
   #join { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 2; }
   #join form { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 12px; }
@@ -60,6 +63,7 @@
 <main>
   <header><h1>Glenda – remote</h1><span id="conn" class="bad">connecting…</span></header>
   <div class="sub"><span id="me"></span><span id="perf">– fps</span></div>
+  <div class="sub"><span>Scene: <b id="sceneName" style="color:var(--text)">–</b></span></div>
 
   <section class="card">
     <div class="label">She's asking</div>
@@ -85,6 +89,9 @@
 
   <details class="card" id="fac">
     <summary>Facilitator controls</summary>
+    <div class="label" style="margin-top:12px">Scene in the room</div>
+    <div class="scenes" id="scenes"></div>
+    <div class="label" style="margin-top:12px">Glenda</div>
     <div class="row">
       <button id="start">Start</button>
       <button id="replay">Replay</button>
@@ -126,22 +133,39 @@
     send(id);
   });
 
+  // scene switching (facilitator): buttons come from scenes.json via the server
+  let sceneList = [];
+  async function loadScenes() {
+    try { sceneList = (await (await fetch('/api/scenes', { cache: 'no-store' })).json()).scenes || []; } catch (e) { sceneList = []; }
+    $('scenes').innerHTML = sceneList.map((s) => `<button data-id="${esc(s.id)}">${esc(s.label)}</button>`).join('') || '<span style="color:var(--muted)">No scenes.json found</span>';
+    $('scenes').querySelectorAll('button').forEach((b) => b.addEventListener('click', async () => {
+      if (!me) return showJoin(true);
+      await fetch('/api/scene', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: b.dataset.id, name: me }) });
+    }));
+  }
+  $('fac').addEventListener('toggle', () => { if ($('fac').open) loadScenes(); });
+  loadScenes();
+
   async function poll() {
     try {
       const s = await (await fetch(`/api/state?client=${client}&name=${encodeURIComponent(me)}`, { cache: 'no-store' })).json();
       const fresh = s.updated && (Date.now() / 1000 - s.updated) < 5;
-      $('conn').textContent = fresh ? 'scene connected' : 'scene not running';
-      $('conn').className = fresh ? 'ok' : 'bad';
+      const st = s.stage || {};
+      $('sceneName').textContent = (st.label || '–') + (st.connected ? '' : ' (stage.html not open)');
+      $('scenes').querySelectorAll('button').forEach((b) => b.classList.toggle('current', b.dataset.id === st.current));
+      const live = fresh || st.connected;
+      $('conn').textContent = fresh ? 'Glenda connected' : st.connected ? 'room connected' : 'scene not running';
+      $('conn').className = live ? 'ok' : 'bad';
       if (fresh && typeof s.fps === 'number') {
         $('perf').textContent = `${s.fps} fps · ${s.res || ''}`;
         $('perf').className = s.fps >= 50 ? 'good' : s.fps >= 30 ? 'ok' : 'low';
       } else { $('perf').textContent = '– fps'; $('perf').className = ''; }
 
-      $('ask').textContent = s.waiting ? (s.ask || '?') : '–';
+      $('ask').textContent = fresh && s.waiting ? (s.ask || '?') : '–';
       $('status').textContent = { speaking: 'Glenda is speaking…', waiting: 'Waiting for an answer', ended: 'End of the visit', idle: 'Waiting for the facilitator to start' }[s.status] || s.status || '';
       const la = s.lastAnswer;
       $('last').innerHTML = la ? `<b>${esc(la.who === me ? 'You' : la.who)}</b> answered <b>${esc(la.answer)}</b> to “${esc(la.ask)}”` : '';
-      $('yes').disabled = $('no').disabled = !s.waiting || !me;
+      $('yes').disabled = $('no').disabled = !(fresh && s.waiting) || !me;
 
       $('people').innerHTML = (s.people || []).map((n) => `<span class="chip${n === me ? ' me' : ''}">${esc(n)}</span>`).join('') || '<span style="color:var(--muted)">nobody yet</span>';
       const h = s.history || [];
