@@ -50,7 +50,7 @@ The live page draws the room panorama and renders Glenda on top every frame. She
 - blinks every few seconds
 - opens her jaw in time with the loudness of the audio while she talks
 
-The virtual room is the physical room's size (6.40 × 5.71 m, 2.24 m walls), with the camera at 1.6 m in the middle.
+The virtual room is the physical room's size (6.40 × 5.71 m, 2.24 m walls), with the camera in the middle at 1.12 m (half the wall height), which is where the Igloo software puts the viewer when it maps a 360 image onto the walls and floor.
 
 ### Changing the room
 
@@ -86,7 +86,8 @@ Save the file and refresh the OBS source; no restart needed.
 |---|---|
 | `hud=1` | Status display |
 | `exposure=1.2` | Brightens Glenda only (the room is fixed in the render) |
-| `cube=1024` | Lowers Glenda's render resolution if the frame rate is low (default 1536) |
+| `cube=768` | Lowers Glenda's render resolution if the frame rate is low (default 1024) |
+| `eye=1.0`, `eye=1.3` | Tries a different viewer height (uses `assets/room_pano_eye100.jpg` etc.) if the room looks too high or low in the Igloo |
 | `yaw=90`, `flip=1` | Rotates or mirrors the whole output to suit the room |
 | `mode=cylinder&vfov=70` | Cylindrical strip output |
 | `say=hello&delay=3` | Plays a dialogue node automatically after loading |
