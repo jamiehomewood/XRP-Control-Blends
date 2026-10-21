@@ -12,7 +12,12 @@ import bpy, bmesh, math, os
 from mathutils import Vector, Matrix
 
 ROOT = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else r"D:\Projects\01_Active\Nursing XRP Scenario 001\blender_room"
-OUT = os.path.join(os.path.dirname(ROOT), "spout-test", "assets", "room_pano_recess.jpg")
+# STYLE "dated" = Glenda's worn-out home; "modern" = the same rooms and recesses with a clean contemporary finish.
+# Set STYLE before running (exec(..., {"STYLE": "modern"})), default dated.
+STYLE = globals().get("STYLE", "dated")
+MODERN = STYLE == "modern"
+SCENE_NAME, COLL_NAME = ("ModernRoom", "ModernShell") if MODERN else ("RecessTest", "RecessShell")
+OUT = os.path.join(os.path.dirname(ROOT), "spout-test", "assets", "room_pano_modern.jpg" if MODERN else "room_pano_recess.jpg")
 X0, X1, Y0, Y1, RH = -3.2, 3.2, -2.855, 2.855, 2.244
 EYE = 1.12
 WIN_DZ = -0.20                                  # window lowered 20 cm from the main room (top now 1.85 m)
@@ -47,22 +52,75 @@ OUTLINE = [
 
 # ---- scene -------------------------------------------------------------------------------------
 main = bpy.data.scenes.get("Scene") or bpy.context.scene
-sc = bpy.data.scenes.get("RecessTest")
+sc = bpy.data.scenes.get(SCENE_NAME)
 if sc:
     for o in list(sc.collection.all_objects):
         if o.get("recess_test"): bpy.data.objects.remove(o, do_unlink=True)
     for c in list(sc.collection.children): sc.collection.children.unlink(c)
     for o in list(sc.collection.objects): sc.collection.objects.unlink(o)
 else:
-    sc = bpy.data.scenes.new("RecessTest")
+    sc = bpy.data.scenes.new(SCENE_NAME)
 sc.world = main.world
-coll = bpy.data.collections.get("RecessShell") or bpy.data.collections.new("RecessShell")
+coll = bpy.data.collections.get(COLL_NAME) or bpy.data.collections.new(COLL_NAME)
 for o in list(coll.objects): bpy.data.objects.remove(o, do_unlink=True)
 if coll.name not in sc.collection.children: sc.collection.children.link(coll)
 
 M = bpy.data.materials
 wallpaper, floor_m, lino, ceiling_m = M["Wallpaper"], M["Floor_wood"], M["Lino"], M["Ceiling_paint"]
 gloss, reveal, shell_m = M["Gloss_white"], M["Reveal"], M["Shell_black"]
+hall_floor = M["Floor_wood"]
+
+def flat(name, color, rough, metal=0.0, emit=None, strength=1.0):
+    m = bpy.data.materials.get(name) or bpy.data.materials.new(name)
+    m.use_nodes = True; nt = m.node_tree; nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputMaterial"); b = nt.nodes.new("ShaderNodeBsdfPrincipled"); nt.links.new(b.outputs[0], out.inputs[0])
+    b.inputs["Base Color"].default_value = (*color, 1); b.inputs["Roughness"].default_value = rough; b.inputs["Metallic"].default_value = metal
+    if emit:
+        for k in ("Emission Color", "Emission"):
+            if k in b.inputs: b.inputs[k].default_value = (*emit, 1); break
+        b.inputs["Emission Strength"].default_value = strength
+    return m
+
+def oak_mat():
+    """Pale oak planks: the Poly Haven wood texture lightened and desaturated."""
+    m = bpy.data.materials.get("Modern_oak") or bpy.data.materials.new("Modern_oak")
+    m.use_nodes = True; nt = m.node_tree; nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputMaterial"); b = nt.nodes.new("ShaderNodeBsdfPrincipled"); nt.links.new(b.outputs[0], out.inputs[0])
+    tc = nt.nodes.new("ShaderNodeTexCoord"); mp = nt.nodes.new("ShaderNodeMapping"); mp.inputs["Scale"].default_value = (0.6, 0.6, 0.6)
+    nt.links.new(tc.outputs["UV"], mp.inputs[0])
+    tex = os.path.join(ROOT, "assets", "tex", "wood_floor_worn_{}.jpg")
+    diff = nt.nodes.new("ShaderNodeTexImage"); diff.image = bpy.data.images.load(tex.format("diff"), check_existing=True); nt.links.new(mp.outputs[0], diff.inputs[0])
+    hsv = nt.nodes.new("ShaderNodeHueSaturation"); hsv.inputs["Saturation"].default_value = 0.45
+    nt.links.new(diff.outputs[0], hsv.inputs["Color"])
+    lift = nt.nodes.new("ShaderNodeMix"); lift.data_type = "RGBA"; lift.blend_type = "SCREEN"; lift.inputs[0].default_value = 0.55
+    nt.links.new(hsv.outputs[0], lift.inputs[6]); lift.inputs[7].default_value = (0.72, 0.6, 0.45, 1)
+    nt.links.new(lift.outputs[2], b.inputs["Base Color"]); b.inputs["Roughness"].default_value = 0.42
+    nor_p = tex.format("nor")
+    if os.path.exists(nor_p):
+        nor = nt.nodes.new("ShaderNodeTexImage"); nor.image = bpy.data.images.load(nor_p, check_existing=True); nor.image.colorspace_settings.name = "Non-Color"
+        nt.links.new(mp.outputs[0], nor.inputs[0]); nm = nt.nodes.new("ShaderNodeNormalMap"); nm.inputs[0].default_value = 0.35
+        nt.links.new(nor.outputs[0], nm.inputs[1]); nt.links.new(nm.outputs[0], b.inputs["Normal"])
+    return m
+
+def tile_mat():
+    """Large-format pale grey porcelain tiles (60 x 60 cm) with fine grout."""
+    m = bpy.data.materials.get("Modern_tile") or bpy.data.materials.new("Modern_tile")
+    m.use_nodes = True; nt = m.node_tree; nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputMaterial"); b = nt.nodes.new("ShaderNodeBsdfPrincipled"); nt.links.new(b.outputs[0], out.inputs[0])
+    tc = nt.nodes.new("ShaderNodeTexCoord"); br = nt.nodes.new("ShaderNodeTexBrick"); nt.links.new(tc.outputs["UV"], br.inputs["Vector"])
+    br.offset = 0.0; br.squash = 1.0
+    br.inputs["Scale"].default_value = 1 / 0.6; br.inputs["Mortar Size"].default_value = 0.003; br.inputs["Brick Width"].default_value = 1.0; br.inputs["Row Height"].default_value = 1.0
+    br.inputs["Color1"].default_value = (0.30, 0.30, 0.29, 1); br.inputs["Color2"].default_value = (0.28, 0.28, 0.275, 1); br.inputs["Mortar"].default_value = (0.12, 0.12, 0.115, 1)
+    nt.links.new(br.outputs["Color"], b.inputs["Base Color"]); b.inputs["Roughness"].default_value = 0.3
+    return m
+
+if MODERN:
+    wallpaper = flat("Modern_wall", (0.80, 0.80, 0.78), 0.85)          # warm white matt emulsion everywhere
+    ceiling_m = flat("Modern_ceiling", (0.85, 0.85, 0.84), 0.9)
+    gloss = flat("Modern_trim", (0.82, 0.82, 0.81), 0.35)             # satin white skirting, linings, door
+    reveal = wallpaper
+    lino = tile_mat()
+    hall_floor = oak_mat()
 
 def mesh_obj(name, verts, faces, uvs, mat):
     me = bpy.data.meshes.new(name); me.from_pydata(verts, [], faces); me.update()
@@ -128,9 +186,12 @@ for i in range(len(OUTLINE)):
         for j, (s0, s1) in enumerate(segs):
             c = a + d * ((s0 + s1) / 2) + n_in * (depth / 2)
             box(f"R{tag}_{i}_{j}", (s1 - s0, depth, h), (c.x, c.y, z), gloss, math.atan2(d.y, d.x))
-    run("Skirting", 0.14, 0.07, 0.02, ("door", "arch"))
-    run("Dado", 0.05, 0.92, 0.025, ("door", "window", "arch"))
-    run("Coving", 0.06, RH - 0.03, 0.06, ())
+    if MODERN:                                                    # slim square skirting, no dado or coving
+        run("Skirting", 0.08, 0.04, 0.015, ("door", "arch"))
+    else:
+        run("Skirting", 0.14, 0.07, 0.02, ("door", "arch"))
+        run("Dado", 0.05, 0.92, 0.025, ("door", "window", "arch"))
+        run("Coving", 0.06, RH - 0.03, 0.06, ())
     s_total += L
 
 # floor, ceiling and kitchen lino follow the outline
@@ -161,7 +222,7 @@ def carpet_mat():
     bump = nt.nodes.new("ShaderNodeBump"); bump.inputs["Strength"].default_value = 0.35; bump.inputs["Distance"].default_value = 0.002
     nt.links.new(fine.outputs["Fac"], bump.inputs["Height"]); nt.links.new(bump.outputs[0], b.inputs["Normal"])
     return m
-carpet = carpet_mat()
+carpet = oak_mat() if MODERN else carpet_mat()
 ngon("RFloor", OUTLINE, 0.0, carpet, flip=True)
 ngon("RCeiling", OUTLINE, RH, ceiling_m)
 
@@ -169,14 +230,15 @@ ngon("RCeiling", OUTLINE, RH, ceiling_m)
 KX0, KX1, KY0, KY1 = X1 + ARCH_T, X1 + KITCHEN_D, KITCHEN_Y[0], KITCHEN_Y[1]
 ngon("RKitchen_floor", [(X1, KY0), (KX1, KY0), (KX1, KY1), (X1, KY1)], 0.0, lino, flip=True)
 ngon("RKitchen_ceiling", [(X1, KY0), (KX1, KY0), (KX1, KY1), (X1, KY1)], RH, ceiling_m)
-kitchen_paint = bpy.data.materials.get("Kitchen_paint") or bpy.data.materials.new("Kitchen_paint")
+kitchen_paint = bpy.data.materials.get(STYLE + "_kitchen_paint") or bpy.data.materials.new(STYLE + "_kitchen_paint")
 kitchen_paint.use_nodes = True; kp = kitchen_paint.node_tree.nodes.get("Principled BSDF")
-kp.inputs["Base Color"].default_value = (0.62, 0.58, 0.42, 1); kp.inputs["Roughness"].default_value = 0.6   # old magnolia gloss
+kp.inputs["Base Color"].default_value = (0.80, 0.80, 0.78, 1) if MODERN else (0.62, 0.58, 0.42, 1)   # white / old magnolia gloss
+kp.inputs["Roughness"].default_value = 0.8 if MODERN else 0.6
 for nm_, a, b_ in [("N", (KX0, KY1), (KX1, KY1)), ("E", (KX1, KY1), (KX1, KY0)), ("S", (KX1, KY0), (KX0, KY0))]:
     a, b_ = Vector(a), Vector(b_); L = (b_ - a).length; d = (b_ - a) / L; n_in = Vector((d.y, -d.x))
     quad(f"RKitchen_wall_{nm_}", [(a.x, a.y, 0), (b_.x, b_.y, 0), (b_.x, b_.y, RH), (a.x, a.y, RH)], kitchen_paint,
          [(0, 0), (L, 0), (L, RH), (0, RH)])
-    for tag, h, z, dep in (("Skirting", 0.12, 0.06, 0.02), ("Coving", 0.06, RH - 0.03, 0.06)):
+    for tag, h, z, dep in ((("Skirting", 0.08, 0.04, 0.015),) if MODERN else (("Skirting", 0.12, 0.06, 0.02), ("Coving", 0.06, RH - 0.03, 0.06))):
         c = (a + b_) / 2 + n_in * (dep / 2)
         box(f"RKitchen_{tag}_{nm_}", (L, dep, h), (c.x, c.y, z), gloss, math.atan2(d.y, d.x))
 
@@ -223,12 +285,13 @@ for i, p_ in enumerate(cp):
         k = len(PROF)
         for j in range(k - 1):
             a_ = (i - 1) * k + j; faces.append((a_, a_ + 1, a_ + k + 1, a_ + k))
-mo = mesh_obj("RArch_mould", verts, faces, uvs, gloss)
-for poly in mo.data.polygons: poly.use_smooth = True
+if not MODERN:                       # the modern version keeps a clean plastered edge
+    mo = mesh_obj("RArch_mould", verts, faces, uvs, gloss)
+    for poly in mo.data.polygons: poly.use_smooth = True
 # kitchen light (it is its own room now)
 bpy.ops.object.light_add(type="AREA", location=((KX0 + KX1) / 2, (KY0 + KY1) / 2, RH - 0.05))
 kl = bpy.context.active_object; kl.name = "RKitchen_light"; kl.data.shape = "RECTANGLE"; kl.data.size = 1.2; kl.data.size_y = 0.25
-kl.data.energy = 120; kl.data.color = (1.0, 0.95, 0.85); kl["recess_test"] = True
+kl.data.energy = 55 if MODERN else 120; kl.data.color = (1.0, 0.95, 0.85); kl["recess_test"] = True
 for c in list(kl.users_collection): c.objects.unlink(kl)
 coll.objects.link(kl)
 
@@ -250,12 +313,12 @@ for nm_, p in {"t": [(SX0, wy1, WIN_SILL + WIN_H), (X0 - T, wy1, WIN_SILL + WIN_
     quad(f"RShell_win_{nm_}", p, reveal)
 
 # ---- hallway beyond the open door --------------------------------------------------------------
-hall_paint = bpy.data.materials.get("Hall_paint") or bpy.data.materials.new("Hall_paint")
+hall_paint = bpy.data.materials.get(STYLE + "_hall_paint") or bpy.data.materials.new(STYLE + "_hall_paint")
 hall_paint.use_nodes = True; hp = hall_paint.node_tree.nodes.get("Principled BSDF")
-hp.inputs["Base Color"].default_value = (0.55, 0.5, 0.38, 1); hp.inputs["Roughness"].default_value = 0.8
+hp.inputs["Base Color"].default_value = (0.70, 0.71, 0.70, 1) if MODERN else (0.55, 0.5, 0.38, 1); hp.inputs["Roughness"].default_value = 0.8
 hx0, hx1, hy1, hy0 = HALL_X[0], HALL_X[1], Y0 - WALL_T, Y0 - WALL_T - HALL_W
 d0, d1 = DOOR_X - DOOR_W / 2, DOOR_X + DOOR_W / 2
-ngon("RHall_floor", [(hx0, hy0), (hx1, hy0), (hx1, hy1), (hx0, hy1)], 0.0, M["Floor_wood"], flip=True)
+ngon("RHall_floor", [(hx0, hy0), (hx1, hy0), (hx1, hy1), (hx0, hy1)], 0.0, hall_floor, flip=True)
 ngon("RHall_ceiling", [(hx0, hy0), (hx1, hy0), (hx1, hy1), (hx0, hy1)], RH, ceiling_m)
 quad("RHall_wall_S", [(hx1, hy0, 0), (hx0, hy0, 0), (hx0, hy0, RH), (hx1, hy0, RH)], hall_paint, [(0, 0), (hx1 - hx0, 0), (hx1 - hx0, RH), (0, RH)])
 quad("RHall_wall_W", [(hx0, hy0, 0), (hx0, hy1, 0), (hx0, hy1, RH), (hx0, hy0, RH)], hall_paint)
@@ -264,7 +327,7 @@ for nm_, (xa, xb, za, zb) in {"a": (hx0, d0, 0, RH), "b": (d1, hx1, 0, RH), "c":
     quad(f"RHall_wall_N_{nm_}", [(xa, hy1, za), (xb, hy1, za), (xb, hy1, zb), (xa, hy1, zb)], hall_paint)
 for nm_, x_ in (("a", d0), ("b", d1)):                                     # door lining through the wall thickness
     quad(f"RDoor_jamb_{nm_}", [(x_, Y0, 0), (x_, hy1, 0), (x_, hy1, DOOR_H), (x_, Y0, DOOR_H)], gloss)
-ngon("RDoor_threshold", [(d0, hy1), (d1, hy1), (d1, Y0), (d0, Y0)], 0.0, M["Floor_wood"], flip=True)
+ngon("RDoor_threshold", [(d0, hy1), (d1, hy1), (d1, Y0), (d0, Y0)], 0.0, hall_floor, flip=True)
 quad("RDoor_head", [(d0, hy1, DOOR_H), (d1, hy1, DOOR_H), (d1, Y0, DOOR_H), (d0, Y0, DOOR_H)], gloss)
 # fill the gap between the architrave opening and the door lining on the room face
 for nm_, (xa, xb) in {"a": (dx0, d0), "b": (d1, dx1)}.items():
@@ -280,7 +343,7 @@ for c in list(hl.users_collection): c.objects.unlink(hl)
 coll.objects.link(hl)
 
 # ---- reuse the architecture from the main room: window, door, radiator, outside view, lights -----
-KEEP = ("Architrave", "Outside_", "Sun", "Ceiling_light")
+KEEP = ("Outside_", "Sun") if MODERN else ("Architrave", "Outside_", "Sun", "Ceiling_light")
 for o in bpy.data.collections["Room"].all_objects:
     if o.name.startswith(KEEP) and o.name not in sc.collection.objects:
         sc.collection.objects.link(o)
@@ -289,6 +352,8 @@ for o in bpy.data.collections["Room"].all_objects:
 for o in list(bpy.data.collections["Room"].all_objects):
     if o.name.startswith(("Win_", "Reveal_", "Window_portal")):
         c = o.copy(); c.name = "RC_" + o.name; c["recess_test"] = True; c.location.z += WIN_DZ; coll.objects.link(c)
+    elif MODERN and o.name.startswith(("Radiator", "Door")):
+        continue                                                  # no radiator (underfloor heating); flush door below
     elif o.name.startswith("Radiator_fin"):
         c = o.copy(); c.name = "RC_" + o.name; c["recess_test"] = True
         bottom, top = 0.145, 0.695; k = (RAD_TOP - bottom) / (top - bottom)
@@ -300,6 +365,29 @@ for o in list(bpy.data.collections["Room"].all_objects):
         coll.objects.link(c)
     elif o.name.startswith("Radiator_pipe"):
         c = o.copy(); c.name = "RC_" + o.name; c["recess_test"] = True; coll.objects.link(c)
+
+# ---- modern finish: flush white door (open into the hall) and recessed downlights instead of the pendant ---
+if MODERN:
+    hinge = Vector((DOOR_X - DOOR_W / 2, Y0 - 0.005, 0))
+    rot = Matrix.Translation(hinge) @ Matrix.Rotation(DOOR_OPEN, 4, "Z") @ Matrix.Translation(-hinge)
+    handle_m = flat("Modern_handle", (0.02, 0.02, 0.02), 0.3, 0.8)
+    for nm_, size, loc, m_ in (("slab", (DOOR_W - 0.006, 0.04, DOOR_H - 0.008), (DOOR_X, Y0 - 0.025, DOOR_H / 2), gloss),
+                               ("handle", (0.15, 0.02, 0.02), (DOOR_X + DOOR_W / 2 - 0.14, Y0 + 0.02, 1.0), handle_m),
+                               ("rose", (0.05, 0.012, 0.05), (DOOR_X + DOOR_W / 2 - 0.07, Y0 + 0.001, 1.0), handle_m)):
+        o = box(f"RModern_door_{nm_}", (1, 1, 1), (0, 0, 0), m_)
+        o.matrix_world = rot @ Matrix.LocRotScale(Vector(loc), None, Vector(size))
+    glow = flat("Modern_downlight", (1, 1, 1), 0.2, emit=(1.0, 0.92, 0.82), strength=25)
+    spots = [(x_, y_) for x_ in (-1.8, 0.0, 1.8) for y_ in (-1.3, 1.2)] + [(0.1, Y1 + GLENDA_D / 2)]
+    for i, (x_, y_) in enumerate(spots):
+        bpy.ops.mesh.primitive_cylinder_add(radius=0.045, depth=0.004, location=(x_, y_, RH - 0.002))
+        dl = bpy.context.active_object; dl.name = f"RModern_downlight_{i}"; dl.data.materials.append(glow); dl["recess_test"] = True
+        for c in list(dl.users_collection): c.objects.unlink(dl)
+        coll.objects.link(dl)
+        bpy.ops.object.light_add(type="SPOT", location=(x_, y_, RH - 0.01))
+        sp = bpy.context.active_object; sp.name = f"RModern_spot_{i}"; sp["recess_test"] = True
+        sp.data.energy = 70; sp.data.spot_size = math.radians(110); sp.data.spot_blend = 0.6; sp.data.shadow_soft_size = 0.04; sp.data.color = (1.0, 0.92, 0.82)
+        for c in list(sp.users_collection): c.objects.unlink(sp)
+        coll.objects.link(sp)
 
 # ---- camera + render settings (same as the main 360 render) -------------------------------------
 cam = bpy.data.objects.get("Cam360_recess")
