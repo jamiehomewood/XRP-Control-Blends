@@ -18,6 +18,10 @@ STYLE = globals().get("STYLE", "dated")
 MODERN = STYLE == "modern"
 SCENE_NAME, COLL_NAME = ("ModernRoom", "ModernShell") if MODERN else ("RecessTest", "RecessShell")
 OUT = os.path.join(os.path.dirname(ROOT), "spout-test", "assets", "room_pano_modern.jpg" if MODERN else "room_pano_recess.jpg")
+# another script can build a copy under its own names (e.g. build_modern_furnished.py)
+SCENE_NAME = globals().get("SCENE_NAME_OVERRIDE", SCENE_NAME)
+COLL_NAME = globals().get("COLL_NAME_OVERRIDE", COLL_NAME)
+OUT = globals().get("OUT_OVERRIDE", OUT)
 X0, X1, Y0, Y1, RH = -3.2, 3.2, -2.855, 2.855, 2.244
 EYE = 1.12
 WIN_DZ = -0.20                                  # window lowered 20 cm from the main room (top now 1.85 m)
