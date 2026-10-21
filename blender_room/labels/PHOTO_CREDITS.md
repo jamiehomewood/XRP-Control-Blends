@@ -1,7 +1,7 @@
 # Photos in the frames (Modern - furnished)
 
 Stand-in family photos from Wikimedia Commons, all **public domain or CC0** (no permission or credit required).
-Each is cropped to its frame and given a slight blur so nobody is recognisable. Replace `photo_N.jpg` with your own photos to personalise the room.
+Each is cropped to its frame and heavily blurred (the children most of all) so nobody is recognisable. Replace `photo_N.jpg` with your own photos to personalise the room.
 
 | File | Frame | Source | Licence |
 |---|---|---|---|

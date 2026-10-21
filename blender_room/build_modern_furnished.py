@@ -301,7 +301,7 @@ def picture(name, img, w, h, loc, rz, frame=0.018, mount=0.035, depth=0.022, fra
     place(objs, loc, rz); bpy.context.view_layer.update()
     return objs
 
-photos = [os.path.join(L_DIR, f"photo_{k}.jpg") for k in range(1, 8)]   # public-domain / CC0 family snapshots, slightly blurred (labels/PHOTO_CREDITS.md)
+photos = [os.path.join(L_DIR, f"photo_{k}.jpg") for k in range(1, 8)]   # public-domain / CC0 family snapshots, heavily blurred (labels/PHOTO_CREDITS.md)
 
 # Jamie's panoramic canvas above the sofa (on the recess back wall, facing into the room)
 pano_img = os.path.join(L_DIR, "panorama_monument_valley.jpg")
