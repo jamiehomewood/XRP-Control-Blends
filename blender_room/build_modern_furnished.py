@@ -301,7 +301,7 @@ def picture(name, img, w, h, loc, rz, frame=0.018, mount=0.035, depth=0.022, fra
     place(objs, loc, rz); bpy.context.view_layer.update()
     return objs
 
-photos = [os.path.join(L_DIR, f"photo_{k}.jpg") for k in range(1, 6)]
+photos = [os.path.join(L_DIR, f"photo_{k}.jpg") for k in range(1, 8)]   # public-domain / CC0 family snapshots, slightly blurred (labels/PHOTO_CREDITS.md)
 
 # Jamie's panoramic canvas above the sofa (on the recess back wall, facing into the room)
 pano_img = os.path.join(L_DIR, "panorama_monument_valley.jpg")
@@ -338,8 +338,8 @@ picture("Gallery_3", photos[2], 0.24, 0.30, (GX + 0.54, Y1, 1.45), 0.0)
 picture("Gallery_4", photos[3], 0.33, 0.22, (GX + 0.02, Y1, 1.23), 0.0)
 picture("Desk_photo_1", photos[4], 0.13, 0.13, (wx + 0.3, -1.6, sbt + 0.11), math.pi / 2, frame=0.012, mount=0.02, depth=0.015, tilt=math.radians(-10),
         frame_m=bpy.data.materials.get("Modern_oak"))
-picture("Desk_photo_2", photos[3], 0.15, 0.10, (wx + 0.3, -0.85, sbt + 0.09), math.pi / 2 - 0.25, frame=0.012, mount=0.02, depth=0.015, tilt=math.radians(-10))
-picture("Side_photo", photos[0], 0.10, 0.13, (0.95, ay + 0.3, top_of(st) + 0.1), 0.15, frame=0.012, mount=0.018, depth=0.015, tilt=math.radians(-10))
+picture("Desk_photo_2", photos[5], 0.15, 0.10, (wx + 0.3, -0.85, sbt + 0.09), math.pi / 2 - 0.25, frame=0.012, mount=0.02, depth=0.015, tilt=math.radians(-10))
+picture("Side_photo", photos[6], 0.10, 0.13, (0.95, ay + 0.3, top_of(st) + 0.1), 0.15, frame=0.012, mount=0.018, depth=0.015, tilt=math.radians(-10))
 
 win.scene = prev_scene
 print("ModernFurnished built:", len(coll.all_objects), "furniture/kitchen objects; render ->", OUT)
