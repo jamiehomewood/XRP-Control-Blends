@@ -120,7 +120,17 @@ def lan_ip():
 
 
 if __name__ == "__main__":
-    srv = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
+    srv = None
+    for port in range(PORT, PORT + 10):              # if 8000 is taken (common on work PCs), try the next ones
+        try:
+            srv = ThreadingHTTPServer(("0.0.0.0", port), Handler); break
+        except OSError as e:
+            print(f"Port {port} is not available ({e.strerror or e}); trying {port + 1}...")
+    if srv is None:
+        raise SystemExit(f"Could not open any port from {PORT} to {PORT + 9}. Close other servers or set GLENDA_PORT.")
+    PORT = port
+    if PORT != 8000:
+        print(f"NOTE: using port {PORT}, so change the OBS Browser source URL to match.")
     ip = lan_ip()
     print("Glenda scene server running.")
     print(f"  OBS Browser source:  http://localhost:{PORT}/index.html")
