@@ -118,7 +118,7 @@ loader.loadAsync(P.get('glenda') ? `assets/${P.get('glenda')}` : ROOM.glenda).th
     const cutout = /short02|hair|eyebrow|eyelash/i.test(m.name);
     m.transparent = false; m.depthWrite = true; m.alphaTest = cutout ? 0.45 : 0;
     if (!cutout) m.alphaMap = null;
-    m.side = cutout || /skirt|sweater/i.test(m.name) ? THREE.DoubleSide : THREE.FrontSide;
+    m.side = cutout || /skirt|sweater|teeth/i.test(m.name) ? THREE.DoubleSide : THREE.FrontSide;   // teeth: both sides, or half of them vanish
     if (/body/i.test(m.name)) m.roughness = 0.55;
     if (/skirt|sweater|clothes|flats/i.test(m.name)) { m.roughness = 0.95; m.metalness = 0; }
     m.needsUpdate = true;
@@ -137,12 +137,33 @@ loader.loadAsync(P.get('glenda') ? `assets/${P.get('glenda')}` : ROOM.glenda).th
   mixer.addEventListener('finished', (e) => { if (e.action === CLIPS.RubbingArm) crossTo(talking() ? CLIPS.Talking : CLIPS.Idle, 0.8); });
   if (P.get('clip') && CLIPS[P.get('clip')]) { current.stop(); current = CLIPS[P.get('clip')]; current.play(); }   // clip=Talking for checking
   mixer.update(0);
+  addMouthShadow(o);
   // remember the resting rotation of the face bones we drive by hand, so the offsets never accumulate
   for (const n of FACE_BONES) if (B[n]) baseQ[n] = B[n].quaternion.clone();
   glendaReady = true;
   console.log('glenda loaded; clips:', g.animations.map(c => c.name + ' ' + c.duration.toFixed(1) + 's').join(', '),
               '; face bones:', FACE_BONES.map(n => n + (B[n] ? ' ok' : ' MISSING')).join(', '));
 }).catch((e) => { glendaReady = true; console.warn('glenda.glb missing', e); });
+
+// The inside of her mouth has no shadow in a live render, so it shows up bright pink when the jaw opens.
+// A small dark shape behind the teeth, carried by the head bone, stands in for the shadow (Blender's renders
+// get it from the light).
+function addMouthShadow(o) {
+  let teeth = null; o.traverse((c) => { if (c.isMesh && /teeth/i.test(c.name + (c.material && c.material.name))) teeth = c; });
+  const head = B.head; if (!teeth || !head) return;
+  o.updateMatrixWorld(true);
+  if (teeth.isSkinnedMesh) teeth.computeBoundingBox();
+  const box = new THREE.Box3().copy(teeth.boundingBox || new THREE.Box3().setFromObject(teeth)).applyMatrix4(teeth.matrixWorld);
+  const size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
+  const bag = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 12), new THREE.MeshBasicMaterial({ color: 0x1c0d0b }));
+  bag.scale.set(size.x * 0.85, size.y * 0.85, size.z * 0.5);
+  c.z -= size.z * 0.35;                 // set back behind the front teeth (she faces +z)
+  head.updateWorldMatrix(true, false);
+  bag.position.copy(head.worldToLocal(c.clone()));
+  const hq = head.getWorldQuaternion(new THREE.Quaternion()).invert(); bag.quaternion.copy(hq);
+  bag.scale.divide(head.getWorldScale(new THREE.Vector3()));
+  head.add(bag);
+}
 
 // ---------- body clips, blinking, jaw ----------
 const CLIPS = {}, animatedBones = new Set(), baseQ = {};
@@ -158,11 +179,14 @@ const talking = () => audioEl && !audioEl.paused && !audioEl.ended;
 const q = new THREE.Quaternion(), eu = new THREE.Euler();
 function setFace(name, x) {           // rest rotation (or the clip's) times a small offset
   const bone = B[name]; if (!bone) return;
-  if (!animatedBones.has(bone.name) && baseQ[name]) bone.quaternion.copy(baseQ[name]);
+  // always start from the resting rotation: the body clips don't reliably rewrite these bones every frame, and
+  // multiplying onto last frame's value makes the jaw (and eyelids) spin round
+  if (baseQ[name]) bone.quaternion.copy(baseQ[name]);
   eu.set(x, 0, 0); q.setFromEuler(eu); bone.quaternion.multiply(q);
 }
 let nextBlink = 2, blinkT = -1, talkEnv = 0, wasTalking = false;
 const JAW_SIGN = parseFloat(P.get('jawsign') || '1');
+const JAW_OPEN = parseFloat(P.get('jawopen') || '0.12');   // radians at full loudness (was 0.22: far too wide)
 const LID_SIGN = parseFloat(P.get('lidsign') || '1');
 function animate(t, dt) {
   // switch body clips: talking while her audio plays, idle otherwise, an arm rub every minute or so
@@ -180,7 +204,7 @@ function animate(t, dt) {
   const lvl = speechLevel();
   talkEnv += (lvl > talkEnv ? 0.6 : 0.15) * (lvl - talkEnv);
   const jtest = P.get('jawtest') === '1' ? 1 : 0;
-  setFace('jaw', JAW_SIGN * 0.22 * Math.max(talkEnv, jtest));
+  setFace('jaw', JAW_SIGN * JAW_OPEN * Math.max(talkEnv, jtest));
 }
 
 // ---------- audio / branching dialogue / remote control ----------
