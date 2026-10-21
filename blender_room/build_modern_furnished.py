@@ -335,7 +335,7 @@ GX = 2.2
 picture("Gallery_1", photos[0], 0.24, 0.30, (GX - 0.5, Y1, 1.45), 0.0)
 picture("Gallery_2", photos[1], 0.39, 0.26, (GX + 0.02, Y1, 1.55), 0.0)
 picture("Gallery_3", photos[2], 0.24, 0.30, (GX + 0.54, Y1, 1.45), 0.0)
-picture("Gallery_4", photos[3], 0.33, 0.22, (GX + 0.02, Y1, 1.23), 0.0)
+picture("Gallery_4", photos[3], 0.33, 0.22, (GX + 0.02, Y1, 1.13), 0.0)
 picture("Desk_photo_1", photos[4], 0.13, 0.13, (wx + 0.3, -1.6, sbt + 0.11), math.pi / 2, frame=0.012, mount=0.02, depth=0.015, tilt=math.radians(-10),
         frame_m=bpy.data.materials.get("Modern_oak"))
 picture("Desk_photo_2", photos[5], 0.15, 0.10, (wx + 0.3, -0.85, sbt + 0.09), math.pi / 2 - 0.25, frame=0.012, mount=0.02, depth=0.015, tilt=math.radians(-10))
