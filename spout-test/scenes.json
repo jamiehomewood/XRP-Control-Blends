@@ -1,5 +1,6 @@
 [
   {"id": "glenda", "label": "Glenda – home visit", "url": "index.html"},
+  {"id": "glenda_modern", "label": "Glenda – home visit (modern flat)", "url": "index.html?room=modern"},
   {"id": "recess", "label": "Empty room – recesses (dated)", "url": "recess_test.html"},
   {"id": "modern", "label": "Empty room – modern", "url": "modern_room.html"},
   {"id": "modern_furnished", "label": "Modern – furnished", "url": "modern_furnished.html"},

@@ -117,3 +117,18 @@ Save the file and refresh the OBS source; no restart needed.
 | `jawtest=1`, `blinktest=1` | Hold the jaw open or the eyes closed (rig checks) |
 
 `index_live_threejs_room.html` is the earlier all-three.js version of the room, kept for reference.
+
+
+## Glenda in the modern flat (`index.html?room=modern`)
+
+Remote scene "Glenda – home visit (modern flat)". Same dialogue, remote and audio as the original scene, but the
+room is `room_pano_modern_glenda.jpg` and Glenda is `glenda_seated.glb`, sitting on her sofa in the alcove:
+
+- trousers and a long-sleeved knit top (one piece of clothing, fitted by MPFB, body removed underneath) - no more
+  hands or skin poking through the clothes
+- Idle and Talking clips layered onto a fixed seated pose: legs stay put, the upper body and head move, and her hands
+  are pinned to her thighs on every frame (`Characters/scripts/glenda_contact.py`)
+- 6.9 MB instead of 21 MB
+- the cube faces rendered live are worked out from her size once she loads
+
+Source: `Characters/Glenda_seated.blend` (the original `Glenda_editable.blend` is untouched).
