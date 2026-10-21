@@ -162,6 +162,35 @@ def openings_for(a, b):
         ops.append((t0, t1, 0.0, RH, "arch"))
     return ops
 
+# ---- swept mouldings (skirting / coving) with mitred corners -------------------------------------
+# profile: list of (o, z) - o = distance out from the wall into the room, z = height.
+# corner ends: +1 outside corner (mitre extends the run), -1 inside corner (mitre shortens it), 0 flat cut with an end cap
+MOD_SKIRT = [(0.0, 0.0), (0.018, 0.0), (0.018, 0.108), (0.016, 0.115), (0.011, 0.119), (0.0, 0.12)]
+_cr, _n = 0.075, 10
+MOD_COVE = [(0.0, RH - _cr)] + [(_cr + _cr * math.cos(math.radians(180 - 90 * k / _n)), RH - _cr + _cr * math.sin(math.radians(180 - 90 * k / _n))) for k in range(1, _n + 1)] + [(0.0, RH)]
+
+def sweep(name, a, b, profile, s0, s1, mat, t0=0.0, t1=None, smooth=True):
+    a, b = Vector(a), Vector(b); L = (b - a).length; d = (b - a) / L; n_in = Vector((d.y, -d.x))
+    t1 = L if t1 is None else t1
+    verts, faces, uvs = [], [], []
+    for (o, z) in profile:
+        for t in (t0 - s0 * o, t1 + s1 * o):
+            p_ = a + d * t + n_in * o; verts.append((p_.x, p_.y, z)); uvs.append((t, z))
+    k = len(profile)
+    for j in range(k - 1):
+        faces.append((2 * j, 2 * j + 1, 2 * j + 3, 2 * j + 2))
+    if s0 == 0: faces.append(tuple(2 * j for j in range(k)))
+    if s1 == 0: faces.append(tuple(2 * j + 1 for j in reversed(range(k))))
+    o_ = mesh_obj(name, verts, faces, uvs, mat)
+    if smooth:
+        for poly in o_.data.polygons[:k - 1]: poly.use_smooth = True
+    return o_
+
+def corner(p_prev, p, p_next):
+    d1 = (Vector(p) - Vector(p_prev)).normalized(); d2 = (Vector(p_next) - Vector(p)).normalized()
+    c = d1.x * d2.y - d1.y * d2.x
+    return 1 if c > 1e-6 else -1 if c < -1e-6 else 0
+
 s_total = 0.0
 pts = OUTLINE + [OUTLINE[0]]
 for i in range(len(OUTLINE)):
@@ -190,8 +219,21 @@ for i in range(len(OUTLINE)):
         for j, (s0, s1) in enumerate(segs):
             c = a + d * ((s0 + s1) / 2) + n_in * (depth / 2)
             box(f"R{tag}_{i}_{j}", (s1 - s0, depth, h), (c.x, c.y, z), gloss, math.atan2(d.y, d.x))
-    if MODERN:                                                    # slim square skirting, no dado or coving
-        run("Skirting", 0.08, 0.04, 0.015, ("door", "arch"))
+    if MODERN:                                                    # swept skirting + cove, mitred at every corner
+        nO = len(OUTLINE)
+        c_start = corner(OUTLINE[(i - 1) % nO], OUTLINE[i], OUTLINE[(i + 1) % nO])
+        c_end = corner(OUTLINE[i], OUTLINE[(i + 1) % nO], OUTLINE[(i + 2) % nO])
+        for tag, prof, skip in (("Skirting", MOD_SKIRT, ("door", "arch")), ("Coving", MOD_COVE, ())):
+            spans_ = [(0.0, L, c_start, c_end)]
+            for o in ops:
+                if o[4] in skip:
+                    new = []
+                    for (s0_, s1_, k0, k1) in spans_:
+                        if o[0] > s0_ + 0.02: new.append((s0_, min(s1_, o[0]), k0, 0))
+                        if o[1] < s1_ - 0.02: new.append((max(s0_, o[1]), s1_, 0, k1))
+                    spans_ = new
+            for j, (s0_, s1_, k0, k1) in enumerate(spans_):
+                sweep(f"R{tag}_{i}_{j}", a, b, prof, k0, k1, gloss if tag == "Skirting" else ceiling_m, s0_, s1_)
     else:
         run("Skirting", 0.14, 0.07, 0.02, ("door", "arch"))
         run("Dado", 0.05, 0.92, 0.025, ("door", "window", "arch"))
@@ -242,7 +284,11 @@ for nm_, a, b_ in [("N", (KX0, KY1), (KX1, KY1)), ("E", (KX1, KY1), (KX1, KY0)),
     a, b_ = Vector(a), Vector(b_); L = (b_ - a).length; d = (b_ - a) / L; n_in = Vector((d.y, -d.x))
     quad(f"RKitchen_wall_{nm_}", [(a.x, a.y, 0), (b_.x, b_.y, 0), (b_.x, b_.y, RH), (a.x, a.y, RH)], kitchen_paint,
          [(0, 0), (L, 0), (L, RH), (0, RH)])
-    for tag, h, z, dep in ((("Skirting", 0.08, 0.04, 0.015),) if MODERN else (("Skirting", 0.12, 0.06, 0.02), ("Coving", 0.06, RH - 0.03, 0.06))):
+    if MODERN:
+        sweep(f"RKitchen_Skirting_{nm_}", a, b_, MOD_SKIRT, -1, -1, gloss)
+        sweep(f"RKitchen_Coving_{nm_}", a, b_, MOD_COVE, -1, -1, ceiling_m)
+        continue
+    for tag, h, z, dep in (("Skirting", 0.12, 0.06, 0.02), ("Coving", 0.06, RH - 0.03, 0.06)):
         c = (a + b_) / 2 + n_in * (dep / 2)
         box(f"RKitchen_{tag}_{nm_}", (L, dep, h), (c.x, c.y, z), gloss, math.atan2(d.y, d.x))
 
@@ -337,6 +383,13 @@ quad("RDoor_head", [(d0, hy1, DOOR_H), (d1, hy1, DOOR_H), (d1, Y0, DOOR_H), (d0,
 for nm_, (xa, xb) in {"a": (dx0, d0), "b": (d1, dx1)}.items():
     quad(f"RDoor_fill_{nm_}", [(xa, Y0, 0), (xb, Y0, 0), (xb, Y0, DOOR_H + 0.07), (xa, Y0, DOOR_H + 0.07)], gloss)
 quad("RDoor_fill_top", [(dx0, Y0, DOOR_H), (dx1, Y0, DOOR_H), (dx1, Y0, DOOR_H + 0.07), (dx0, Y0, DOOR_H + 0.07)], gloss)
+if MODERN:                           # flat square-edged architraves, both faces, standing proud of the skirting
+    AW, AT = 0.07, 0.022
+    for side, yface, sgn in (("room", Y0, 1), ("hall", hy1, -1)):
+        yc = yface + sgn * AT / 2
+        for nm_, xc in (("l", d0 - AW / 2), ("r", d1 + AW / 2)):
+            box(f"RArchitrave_{side}_{nm_}", (AW, AT, DOOR_H + AW), (xc, yc, (DOOR_H + AW) / 2), gloss)
+        box(f"RArchitrave_{side}_head", (DOOR_W + 2 * AW, AT, AW), (DOOR_X, yc, DOOR_H + AW / 2), gloss)
 for nm_, (a, b_) in {"S": ((hx1, hy0), (hx0, hy0)), "Na": ((hx0, hy1), (d0, hy1)), "Nb": ((d1, hy1), (hx1, hy1))}.items():
     a, b_ = Vector(a), Vector(b_); L = (b_ - a).length; dd = (b_ - a) / L; n_in = Vector((dd.y, -dd.x)); c = (a + b_) / 2 + n_in * 0.01
     box(f"RHall_skirting_{nm_}", (L, 0.02, 0.14), (c.x, c.y, 0.07), gloss, math.atan2(dd.y, dd.x))
