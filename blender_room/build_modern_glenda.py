@@ -69,12 +69,14 @@ smn, smx = bounds(sofa)
 gltf("throw_pillows_01", (smn.x + 0.42, smx.y - 0.3), rot_z=0.2, scale=0.6, z=0.42)
 gltf("throw_pillows_01", (smx.x - 0.42, smx.y - 0.3), rot_z=-0.15, scale=0.6, z=0.42)
 pano_canvas(0.0, ay1, 1.45, 0.0)                             # Jamie's panorama on the alcove's back wall, above her
-# walking stick leaning on the sofa's left arm, towel on the floor where her feet will be (flat, fine on the real floor)
-TILT = 0.39; SB = Vector((smn.x - 0.05, smn.y + 0.15, 0.0)); SD = Vector((math.sin(TILT), 0, math.cos(TILT)))
+# walking stick in the gap between the sofa's left arm and the alcove wall, leaning on the wall (clear of the arm);
+# towel on the floor where her feet will be (flat, fine on the real floor)
+SB = Vector(((smn.x + SH["GLENDA_X"][0]) / 2 + 0.03, smn.y + 0.2, 0.0))
+TILT = -math.asin(min(0.3, (SB.x - SH["GLENDA_X"][0] - 0.012) / 0.88)); SD = Vector((math.sin(TILT), 0, math.cos(TILT)))
 stick_m = flat("GL_stick", (0.18, 0.11, 0.06), 0.4)
 cyl("GL_stick", 0.011, 0.88, SB + SD * 0.44, stick_m, rot=(0, TILT, 0), verts=12)
 top = SB + SD * 0.88
-cyl("GL_stick_handle", 0.014, 0.13, (top.x + 0.035, top.y, top.z + 0.012), stick_m, rot=(0, math.radians(80), 0))
+cyl("GL_stick_handle", 0.014, 0.13, (top.x + 0.01, top.y - 0.05, top.z + 0.012), stick_m, rot=(math.radians(80), 0, 0))
 box("GL_towel", (0.72, 0.48, 0.012), (0.0, smn.y - 0.22, 0.006), flat("GL_towel", (0.78, 0.76, 0.7), 0.95), 0.08)
 
 # her side table inside the (widened) alcove, beside the sofa: tablets, Gaviscon, Rennie, glasses, lamp
