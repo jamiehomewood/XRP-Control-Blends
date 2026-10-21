@@ -16,7 +16,7 @@ floor; her clutter (dog basket and bowls, pad deliveries, bin bags) is beyond th
 Run inside Glenda_Room.blend. Builds the scene "ModernGlenda" and renders room_pano_modern_glenda.jpg.
 """
 import bpy, math, os, random
-from mathutils import Vector
+from mathutils import Vector, Matrix
 
 ROOT = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else r"D:\Projects\01_Active\Nursing XRP Scenario 001\blender_room"
 L_DIR = os.path.join(ROOT, "labels")
@@ -66,11 +66,29 @@ def quad(name, pts, m, uv=((0, 0), (1, 0), (1, 1), (0, 1))):
 ay0, ay1 = Y1, Y1 + GLENDA_D
 sofa = snap(gltf("sofa_03", (0.0, ay0 + 0.45), rot_z=0.0, scale=0.8), 1, +1, ay1 - 0.03)
 smn, smx = bounds(sofa)
-# her two orange throw cushions, standing on the seat cushions (the seat's height found by a ray from just above it,
-# so they sit on top instead of sinking through), leaning back against the sofa's own cushions
-for px_, rz_ in ((smn.x + 0.42, 0.2), (smx.x - 0.42, -0.15)):
-    py_ = smx.y - 0.56                          # in front of the sofa's own cushions, on the seat
-    gltf("throw_pillows_01", (px_, py_), rot_z=rz_, scale=0.6, z=surface_z(px_, py_, z_from=0.62) - 0.01)
+# her two pairs of orange throw cushions on the seat, one pair at each end, in front of the sofa's own cushions.
+# Each cushion is settled on its own: rays down over its footprint (cushions hidden) find the highest point under it,
+# so neither cushion of a pair sinks into the seat or the sofa arm.
+def settle(root):
+    meshes = [o for o in root.children_recursive if o.type == "MESH"]
+    for o in meshes: o.hide_viewport = True
+    bpy.context.view_layer.update(); dg = bpy.context.evaluated_depsgraph_get()
+    hits = {}
+    for o in meshes:
+        pts = [o.matrix_world @ Vector(c) for c in o.bound_box]
+        x0, x1 = min(p.x for p in pts), max(p.x for p in pts); y0, y1 = min(p.y for p in pts), max(p.y for p in pts)
+        zs = []
+        for fx in (0.15, 0.5, 0.85):
+            for fy in (0.2, 0.5, 0.8):
+                h = sc.ray_cast(dg, Vector((x0 + (x1 - x0) * fx, y0 + (y1 - y0) * fy, 1.0)), Vector((0, 0, -1)))
+                if h[0]: zs.append(h[1].z)
+        hits[o] = (max(zs) if zs else None, min(p.z for p in pts))
+    for o in meshes: o.hide_viewport = False
+    for o, (top, bottom) in hits.items():
+        if top is not None: o.matrix_world = Matrix.Translation((0, 0, top - 0.015 - bottom)) @ o.matrix_world
+    bpy.context.view_layer.update()
+for px_, rz_ in ((smn.x + 0.5, 0.2), (smx.x - 0.5, -0.15)):
+    settle(gltf("throw_pillows_01", (px_, smx.y - 0.56), rot_z=rz_, scale=0.6, z=0.45))
 pano_canvas(0.0, ay1, 1.45, 0.0)                             # Jamie's panorama on the alcove's back wall, above her
 # walking stick in the gap between the sofa's left arm and the alcove wall, leaning on the wall (clear of the arm);
 # towel on the floor where her feet will be (flat, fine on the real floor)
