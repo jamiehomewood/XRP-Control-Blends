@@ -3,5 +3,6 @@
   {"id": "recess", "label": "Empty room – recesses (dated)", "url": "recess_test.html"},
   {"id": "modern", "label": "Empty room – modern", "url": "modern_room.html"},
   {"id": "modern_furnished", "label": "Modern – furnished", "url": "modern_furnished.html"},
+  {"id": "modern_glenda", "label": "Modern – Glenda's things", "url": "modern_glenda.html"},
   {"id": "blank", "label": "Blank (black)", "url": "about:blank"}
 ]
