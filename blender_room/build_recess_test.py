@@ -38,13 +38,15 @@ KITCHEN_D, KITCHEN_Y = 2.2, (-1.65, Y1)  # kitchen depth beyond the real wall, a
 ARCH_Y, ARCH_SPRING, ARCH_TOP, ARCH_T = (-1.1, 2.15), 1.55, 1.88, 0.15   # opening, where the curve starts, its top, wall thickness
 DRESSER_D, DRESSER_Y = 0.55, (-2.2, -0.5)  # west wall: the tall dresser with the TV
 SOFA_D, SOFA_X1 = 0.80, -0.85            # south wall, SW corner: the sofa
-GLENDA_D, GLENDA_X = 0.90, (-1.0, 1.25)  # north wall: alcove for Glenda's chair, stick and side table
+GLENDA_D, GLENDA_X = 0.90, globals().get("GLENDA_X_OVERRIDE", (-1.0, 1.25))   # north wall: alcove for Glenda (wider in some scenes)
+BOOK_RECESS = globals().get("BOOK_RECESS")      # optional (x0, x1, depth): a shallow north-wall recess for a bookshelf
 HALL_W, HALL_X, WALL_T = 1.35, (-0.6, 3.0), 0.15   # hallway beyond the south door (width, extent), wall thickness
 DOOR_OPEN = math.radians(-78)                    # door swings OUT into the hall, so it never covers the real floor
 
 # room outline, walked clockwise seen from above (interior on the right). Openings are added per segment.
 OUTLINE = [
     (X0, Y1),                                                        # north wall (Glenda's), with her alcove
+    *([(BOOK_RECESS[0], Y1), (BOOK_RECESS[0], Y1 + BOOK_RECESS[2]), (BOOK_RECESS[1], Y1 + BOOK_RECESS[2]), (BOOK_RECESS[1], Y1)] if BOOK_RECESS else []),
     (GLENDA_X[0], Y1), (GLENDA_X[0], Y1 + GLENDA_D), (GLENDA_X[1], Y1 + GLENDA_D), (GLENDA_X[1], Y1),
     (X1, Y1),
     (X1, Y0),                                                        # east wall: real wall line, with the kitchen arch

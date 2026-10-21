@@ -28,6 +28,7 @@ OUT = globals().get("FURN_OUT", os.path.join(os.path.dirname(ROOT), "spout-test"
 shell_py = os.path.join(ROOT, "build_recess_test.py")
 g = {"__file__": shell_py, "__name__": "__main__", "STYLE": "modern",
      "SCENE_NAME_OVERRIDE": SCENE, "COLL_NAME_OVERRIDE": SHELL_COLL, "OUT_OVERRIDE": OUT}
+g.update(globals().get("FURN_SHELL_EXTRA", {}))                # e.g. a wider alcove / extra recess for another scene
 exec(compile(open(shell_py, encoding="utf-8").read(), shell_py, "exec"), g)
 X0, X1, Y0, Y1, RH = g["X0"], g["X1"], g["Y0"], g["Y1"], g["RH"]
 KX0, KX1, KY0, KY1 = g["KX0"], g["KX1"], g["KY0"], g["KY1"]

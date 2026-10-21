@@ -26,7 +26,9 @@ random.seed(7)
 # 1. shell + fitted kitchen, without the modern living-room furniture
 fp = os.path.join(ROOT, "build_modern_furnished.py")
 g = {"__file__": fp, "__name__": "__main__", "FURN_SCENE": "ModernGlenda", "FURN_SHELL_COLL": "ModernGlendaShell",
-     "FURN_COLL": "ModernGlendaThings", "FURN_LIVING": False, "FURN_KITCHEN": "traditional", "FURN_OUT": OUT}
+     "FURN_COLL": "ModernGlendaThings", "FURN_LIVING": False, "FURN_KITCHEN": "traditional", "FURN_OUT": OUT,
+     # a wider alcove (sofa + side table both inside it) and a bookshelf recess, so nothing deep stands out on the floor
+     "FURN_SHELL_EXTRA": {"GLENDA_X_OVERRIDE": (-1.3, 2.0), "BOOK_RECESS": (-2.95, -1.75, 0.40)}}
 exec(compile(open(fp, encoding="utf-8").read(), fp, "exec"), g)
 gltf, snap, bounds, top_of, box, cyl, flat, link, picture, pano_canvas, PHOTOS = (g[k] for k in ("gltf", "snap", "bounds", "top_of", "box", "cyl", "flat", "link", "picture", "pano_canvas", "PHOTOS"))
 SH = g["g"]                                                   # the shell script's names (WIN_SILL, WALL_T, ...)
@@ -61,22 +63,22 @@ def quad(name, pts, m, uv=((0, 0), (1, 0), (1, 1), (0, 1))):
 
 # ======================================================================== Glenda's alcove: her sofa (she will sit here)
 ay0, ay1 = Y1, Y1 + GLENDA_D
-sofa = snap(gltf("sofa_03", (0.12, ay0 + 0.45), rot_z=0.0, scale=0.8), 1, +1, ay1 - 0.03)
+sofa = snap(gltf("sofa_03", (0.0, ay0 + 0.45), rot_z=0.0, scale=0.8), 1, +1, ay1 - 0.03)
 smn, smx = bounds(sofa)
 gltf("throw_pillows_01", (smn.x + 0.42, smx.y - 0.3), rot_z=0.2, scale=0.6, z=0.42)
 gltf("throw_pillows_01", (smx.x - 0.42, smx.y - 0.3), rot_z=-0.15, scale=0.6, z=0.42)
-pano_canvas(0.12, ay1, 1.45, 0.0)                             # Jamie's panorama on the alcove's back wall, above her
+pano_canvas(0.0, ay1, 1.45, 0.0)                             # Jamie's panorama on the alcove's back wall, above her
 # walking stick leaning on the sofa's left arm, towel on the floor where her feet will be (flat, fine on the real floor)
 TILT = 0.39; SB = Vector((smn.x - 0.05, smn.y + 0.15, 0.0)); SD = Vector((math.sin(TILT), 0, math.cos(TILT)))
 stick_m = flat("GL_stick", (0.18, 0.11, 0.06), 0.4)
 cyl("GL_stick", 0.011, 0.88, SB + SD * 0.44, stick_m, rot=(0, TILT, 0), verts=12)
 top = SB + SD * 0.88
 cyl("GL_stick_handle", 0.014, 0.13, (top.x + 0.035, top.y, top.z + 0.012), stick_m, rot=(0, math.radians(80), 0))
-box("GL_towel", (0.72, 0.48, 0.012), (0.12, smn.y - 0.22, 0.006), flat("GL_towel", (0.78, 0.76, 0.7), 0.95), 0.08)
+box("GL_towel", (0.72, 0.48, 0.012), (0.0, smn.y - 0.22, 0.006), flat("GL_towel", (0.78, 0.76, 0.7), 0.95), 0.08)
 
-# her side table just outside the alcove, against the north wall: tablets, Gaviscon, Rennie, glasses, lamp
-TX = 1.62
-side = snap(gltf("side_table_01", (TX, Y1 - 0.25)), 1, +1, Y1 - 0.02)
+# her side table inside the (widened) alcove, beside the sofa: tablets, Gaviscon, Rennie, glasses, lamp
+TX = 1.55
+side = snap(gltf("side_table_01", (TX, ay0 + 0.5)), 1, +1, ay1 - 0.04)
 ST = top_of(side); tmn, tmx = bounds(side); ty = (tmn.y + tmx.y) / 2
 gltf("round_spectacles", (TX - 0.12, ty - 0.1), rot_z=0.4, fit_w=0.14, z=ST)
 for i in range(7):
@@ -116,23 +118,27 @@ gltf("tea_set_01", (dmn.x + 0.34, dcy - 0.45), rot_z=math.pi / 2 + 0.3, fit_w=0.
 gltf("standing_picture_frame_01", (dmn.x + 0.3, dcy + 0.45), rot_z=math.pi / 2 - 0.3, fit_h=0.2, z=dtop)
 
 # family photo gallery (blurred stand-ins) on the north wall, east of the side table
-GX = 2.45
-picture("GL_gallery_1", PHOTOS[0], 0.24, 0.30, (GX - 0.5, Y1, 1.5), 0.0)
-picture("GL_gallery_2", PHOTOS[1], 0.39, 0.26, (GX + 0.02, Y1, 1.6), 0.0)
-picture("GL_gallery_3", PHOTOS[2], 0.24, 0.30, (GX + 0.54, Y1, 1.5), 0.0)
-picture("GL_gallery_4", PHOTOS[3], 0.33, 0.22, (GX + 0.02, Y1, 1.18), 0.0)
+GX = 2.6                                                      # on the 1.2 m of flat wall east of the widened alcove
+picture("GL_gallery_1", PHOTOS[0], 0.19, 0.24, (GX - 0.406, Y1, 1.5), 0.0)
+picture("GL_gallery_2", PHOTOS[1], 0.31, 0.21, (GX, Y1, 1.6), 0.0)
+picture("GL_gallery_3", PHOTOS[2], 0.19, 0.24, (GX + 0.406, Y1, 1.5), 0.0)
+picture("GL_gallery_4", PHOTOS[3], 0.26, 0.18, (GX, Y1, 1.27), 0.0)
 
-# ======================================================================== north wall (west of the alcove): bookshelf, papers, clock
-shelf = snap(gltf("wooden_bookshelf_worn", (-2.4, Y1 - 0.2), rot_z=0.0, fit_h=1.2), 1, +1, Y1 - 0.02)
+# ======================================================================== bookshelf recess (north wall, west of the alcove): shelf, papers, clock
+BR = (-2.95, -1.75, 0.40)
+shelf = snap(gltf("wooden_bookshelf_worn", ((BR[0] + BR[1]) / 2 - 0.12, Y1 + 0.2), rot_z=0.0, fit_h=1.2), 1, +1, Y1 + BR[2] - 0.02)
 bmn, bmx = bounds(shelf)
 SHELF = surface_z((bmn.x + bmx.x) / 2, (bmn.y + bmx.y) / 2, 0.75)
 gltf("book_encyclopedia_set_01", ((bmn.x + bmx.x) / 2, (bmn.y + bmx.y) / 2), z=SHELF + 0.002, fit_w=0.5)
 news = img_mat("GL_news", os.path.join(L_DIR, "newspaper.png"), 0.9)
-for (x, y, n) in [(-1.45, Y1 - 0.2, 12), (-3.0, Y1 - 0.22, 16), (X0 + 0.25, 1.75, 9)]:
+piles = [((BR[1] - 0.17, Y1 + BR[2] - 0.22), 10, math.pi / 2)]            # beside the shelf, inside the recess
+hy1_ = Y0 - SH["WALL_T"]
+piles += [((-0.35, hy1_ - 0.3), 14, 0.0), ((2.55, hy1_ - 0.3), 9, 0.0)]  # more in the hall
+for (x, y), n, base in piles:
     for i in range(n):
-        box(f"GL_news_{x}_{i}", (0.42, 0.3, 0.025), (x + random.uniform(-0.03, 0.03), y + random.uniform(-0.02, 0.02), 0.0125 + i * 0.025), news,
-            random.uniform(-0.25, 0.25) + (math.pi / 2 if x < X0 + 0.5 else 0))
-gltf("wall_clock", (-1.6, Y1 - 0.03), z=1.75)
+        box(f"GL_news_{x:.2f}_{i}", (0.42, 0.3, 0.025), (x + random.uniform(-0.02, 0.02), y + random.uniform(-0.015, 0.015), 0.0125 + i * 0.025), news,
+            base + random.uniform(-0.15, 0.15))
+gltf("wall_clock", ((BR[0] + BR[1]) / 2, Y1 + BR[2] - 0.03), z=1.75)                 # above the bookshelf
 gltf("potted_plant_02", (X0 + 0.07, 0.85), fit_h=0.32, z=SH["WIN_SILL"])
 
 # ======================================================================== kitchen (beyond the real wall): her things on the fitted units
