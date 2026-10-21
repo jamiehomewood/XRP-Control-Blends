@@ -69,7 +69,7 @@ smn, smx = bounds(sofa)
 # her two orange throw cushions, standing on the seat cushions (the seat's height found by a ray from just above it,
 # so they sit on top instead of sinking through), leaning back against the sofa's own cushions
 for px_, rz_ in ((smn.x + 0.42, 0.2), (smx.x - 0.42, -0.15)):
-    py_ = smx.y - 0.4
+    py_ = smx.y - 0.56                          # in front of the sofa's own cushions, on the seat
     gltf("throw_pillows_01", (px_, py_), rot_z=rz_, scale=0.6, z=surface_z(px_, py_, z_from=0.62) - 0.01)
 pano_canvas(0.0, ay1, 1.45, 0.0)                             # Jamie's panorama on the alcove's back wall, above her
 # walking stick in the gap between the sofa's left arm and the alcove wall, leaning on the wall (clear of the arm);
