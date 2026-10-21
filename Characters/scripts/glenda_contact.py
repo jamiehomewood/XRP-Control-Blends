@@ -49,7 +49,11 @@ def ik_to(side, target):
     q = {bn: rig.convert_space(pose_bone=pb[f"{bn}.{side}"], matrix=pb[f"{bn}.{side}"].matrix, from_space="POSE", to_space="LOCAL").to_quaternion() for bn in CHAIN}
     wb = pb[f"wrist.{side}"]
     want = Matrix.LocRotScale(wb.matrix.to_translation(), BASE_WR[side], Vector((1, 1, 1)))
-    q["wrist"] = rig.convert_space(pose_bone=wb, matrix=want, from_space="POSE", to_space="LOCAL").to_quaternion()
+    qw = rig.convert_space(pose_bone=wb, matrix=want, from_space="POSE", to_space="LOCAL").to_quaternion()
+    # never bend the wrist more than MAX_WRIST away from its resting bend (more than that tears the hand off the sleeve)
+    rest = BASE_WL[side]; d = rest.rotation_difference(qw)
+    if d.angle > MAX_WRIST: qw = rest.slerp(qw, MAX_WRIST / d.angle)
+    q["wrist"] = qw
     pb[f"lowerarm02.{side}"].constraints.remove(c)
     return q
 def write(F, f0, f, side, q):
@@ -61,8 +65,10 @@ def write(F, f0, f, side, q):
     for bn in q:
         for ax in range(4): F[(f"{bn}.{side}", ax)].update()
 BASE_WR = {s: Quaternion(v) for s, v in json.loads(rig.get("base_wrist_rot", "{}")).items()}
+MAX_WRIST = 0.35
+BASE_WL = {s: Quaternion(v) for s, v in json.loads(rig.get("base_wrist_local", "{}")).items()}
 BASE_W = {s: Vector(v) for s, v in json.loads(rig.get("base_wrist", "{}")).items()}
-def contact(clip, fa, fb, reach=0.04):
+def contact(clip, fa, fb, reach=0.03):
     act = bpy.data.actions[clip]; rig.animation_data.action = act; F = fc_map(act)
     f0 = int(act.frame_range[0]); stats = [0, 0]
     for m in MASKS: m.show_viewport = False
@@ -77,16 +83,16 @@ def contact(clip, fa, fb, reach=0.04):
                 def at(z):
                     tgt.z = z; write(F, f0, f, side, ik_to(side, tgt)); sc.frame_set(f); return measure(side)
                 pen, gap = at(tgt.z)
-                if pen > 0.004:
+                if pen > 0.003:
                     lo, hi = tgt.z, tgt.z + 0.06
                 else:
                     lo, hi = tgt.z - max(gap, 0.01) - 0.01, tgt.z
                 for it in range(7):
                     mid = (lo + hi) / 2; pm, gm = at(mid)
-                    if pm > 0.004: lo = mid
+                    if pm > 0.003: lo = mid
                     else: hi = mid
                 pen, gap = at(hi)
-                stats[0 if (pen <= 0.004 and gap <= 0.012) else 1] += 1
+                stats[0 if (pen <= 0.003 and gap <= 0.012) else 1] += 1
     finally:
         for m in MASKS: m.show_viewport = True
     return stats

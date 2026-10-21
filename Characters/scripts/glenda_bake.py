@@ -41,6 +41,8 @@ def bake(clip):
             q = base[bn]
             if w > 0:
                 d = REF[bn].inverted() @ _q(cur, bn, f)
+                if bn.startswith(("spine", "neck")):          # keep her upright: no sideways lean, half the twist
+                    d = Quaternion((d.w, d.x, d.y * 0.5, 0.0)).normalized()
                 if w < 1: d = Quaternion().slerp(d, w)
                 q = base[bn] @ d
             if vals and q.dot(vals[-1][1]) < 0: q = -q
