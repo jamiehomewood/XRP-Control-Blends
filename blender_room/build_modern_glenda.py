@@ -66,8 +66,11 @@ def quad(name, pts, m, uv=((0, 0), (1, 0), (1, 1), (0, 1))):
 ay0, ay1 = Y1, Y1 + GLENDA_D
 sofa = snap(gltf("sofa_03", (0.0, ay0 + 0.45), rot_z=0.0, scale=0.8), 1, +1, ay1 - 0.03)
 smn, smx = bounds(sofa)
-gltf("throw_pillows_01", (smn.x + 0.42, smx.y - 0.3), rot_z=0.2, scale=0.6, z=0.42)
-gltf("throw_pillows_01", (smx.x - 0.42, smx.y - 0.3), rot_z=-0.15, scale=0.6, z=0.42)
+# her two orange throw cushions, standing on the seat cushions (the seat's height found by a ray from just above it,
+# so they sit on top instead of sinking through), leaning back against the sofa's own cushions
+for px_, rz_ in ((smn.x + 0.42, 0.2), (smx.x - 0.42, -0.15)):
+    py_ = smx.y - 0.4
+    gltf("throw_pillows_01", (px_, py_), rot_z=rz_, scale=0.6, z=surface_z(px_, py_, z_from=0.62) - 0.01)
 pano_canvas(0.0, ay1, 1.45, 0.0)                             # Jamie's panorama on the alcove's back wall, above her
 # walking stick in the gap between the sofa's left arm and the alcove wall, leaning on the wall (clear of the arm);
 # towel on the floor where her feet will be (flat, fine on the real floor)
