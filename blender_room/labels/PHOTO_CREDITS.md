@@ -14,3 +14,9 @@ Each is cropped to its frame and heavily blurred (the children most of all) so n
 | photo_7.jpg | side table in the alcove | [Parents, children decorate pumpkins (3917482).jpg](https://commons.wikimedia.org/wiki/File:Parents,_children_decorate_pumpkins_(3917482).jpg) – right half (boy with pumpkin) | Public domain |
 
 `panorama_monument_valley.jpg` (above the sofa) is Jamie's own canvas print, photographed and straightened.
+
+## Garden outside the window (Modern - Glenda's things)
+
+| File | Source | Licence |
+|---|---|---|
+| garden_backdrop.jpg | [Back garden - Coleridge Cottage - Nether Stowey - Somerset, England - DSC01109.jpg](https://commons.wikimedia.org/wiki/File:Back_garden_-_Coleridge_Cottage_-_Nether_Stowey_-_Somerset,_England_-_DSC01109.jpg) by Daderot, 3840 px copy | CC0 |

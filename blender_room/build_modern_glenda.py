@@ -28,7 +28,8 @@ fp = os.path.join(ROOT, "build_modern_furnished.py")
 g = {"__file__": fp, "__name__": "__main__", "FURN_SCENE": "ModernGlenda", "FURN_SHELL_COLL": "ModernGlendaShell",
      "FURN_COLL": "ModernGlendaThings", "FURN_LIVING": False, "FURN_KITCHEN": "traditional", "FURN_OUT": OUT,
      # a wider alcove (sofa + side table both inside it) and a bookshelf recess, so nothing deep stands out on the floor
-     "FURN_SHELL_EXTRA": {"GLENDA_X_OVERRIDE": (-1.3, 2.0), "BOOK_RECESS": (-2.95, -1.75, 0.40)}}
+     "FURN_SHELL_EXTRA": {"GLENDA_X_OVERRIDE": (-1.3, 2.0), "BOOK_RECESS": (-2.95, -1.75, 0.40),
+                          "GARDEN_PHOTO": "garden_backdrop.jpg"}}
 exec(compile(open(fp, encoding="utf-8").read(), fp, "exec"), g)
 gltf, snap, bounds, top_of, box, cyl, flat, link, picture, pano_canvas, PHOTOS = (g[k] for k in ("gltf", "snap", "bounds", "top_of", "box", "cyl", "flat", "link", "picture", "pano_canvas", "PHOTOS"))
 SH = g["g"]                                                   # the shell script's names (WIN_SILL, WALL_T, ...)
