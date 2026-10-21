@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Glenda 360 Scene</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  canvas { display: block; }
+  #hud { position: fixed; left: 8px; bottom: 8px; font: 13px monospace; color: #0f0; white-space: pre;
+         background: rgba(0,0,0,.65); padding: 6px 10px; pointer-events: none; }
+</style>
+<script type="importmap">
+{ "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="hud"></div>
+<script type="module">
+/*
+  Glenda's living room – 360 output for IglooPreview / the Igloo room via Spout.
+  Serve this folder over http (start-server.bat) and point an OBS Browser source at it.
+
+  How it's put together
+    assets/room_pano.jpg      the room, rendered in Blender Cycles as a 360 panorama from the viewer's position
+                              (Glenda is invisible in it, but her shadow is baked in)
+    assets/glenda.glb         Glenda, rendered live on top so she can breathe, blink and talk
+    assets/room_proxies.glb   invisible copies of the chair, stick and side table so they can sit in front of her
+    dialogue.json             her lines and their audio files
+
+  Interaction: dialogue.json is a small branching tree. Use the remote (http://<PC IP>:8000/control.html, served by
+  server.py) or keys in the scene (click it first / OBS "Interact"):
+    Space start   Y yes   N no   R replay   T new take   S stop   H status display
+
+  URL options:  say=hello  delay=2  hud=1  mode=cylinder  vfov=60  cube=1536  yaw=0  flip=1  exposure=1
+                persp=1 (close-up camera on Glenda)  still=1 (render one frame, for testing)  jawtest=1
+*/
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const P = new URLSearchParams(location.search);
+const MODE = P.get('mode') === 'cylinder' ? 1 : 0;
+const VFOV = THREE.MathUtils.degToRad(parseFloat(P.get('vfov') || '60'));
+const CUBE = parseInt(P.get('cube') || '1536', 10);
+let yaw = THREE.MathUtils.degToRad(parseFloat(P.get('yaw') || '0'));
+const FLIP = P.get('flip') === '1' ? -1 : 1;
+let SHOW_HUD = P.get('hud') === '1';
+const STILL = P.get('still') === '1';
+const EYE = 1.6;                                   // must match the Blender 360 camera height
+
+// ---------- renderer ----------
+const renderer = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.AgXToneMapping;      // Blender rendered the room with AgX too
+renderer.toneMappingExposure = parseFloat(P.get('exposure') || '1.0');
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();                   // holds only Glenda + invisible occluders
+const loader = new GLTFLoader();
+
+// ---------- the room panorama ----------
+let panoTex = null;
+const panoReady = new Promise((res) => new THREE.TextureLoader().load('assets/room_pano.jpg', (t) => {
+  t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping; t.minFilter = THREE.LinearFilter;
+  t.generateMipmaps = false; panoTex = t; res(t);
+}));
+
+// lighting for Glenda: image-based light from the same panorama, plus the window sun and the table lamp
+panoReady.then((t) => {
+  // three's equirect convention puts +X (east) at the image centre; Blender's puts north there.
+  // Shift the image a quarter turn so the environment lighting comes from the right directions.
+  const img = t.image, c = document.createElement('canvas');
+  c.width = 2048; c.height = 1024; const g = c.getContext('2d');
+  g.drawImage(img, -c.width * 0.25, 0, c.width, c.height); g.drawImage(img, c.width * 0.75, 0, c.width, c.height);
+  const et = new THREE.CanvasTexture(c); et.colorSpace = THREE.SRGBColorSpace; et.mapping = THREE.EquirectangularReflectionMapping;
+  scene.environment = new THREE.PMREMGenerator(renderer).fromEquirectangular(et).texture;
+});
+const sun = new THREE.DirectionalLight(0xfff0dc, 1.8);          // low afternoon sun through the west window
+sun.position.set(-8.7, 3.75, -5.4); sun.target.position.set(0, 0.6, -2.2);
+scene.add(sun, sun.target);
+const lamp = new THREE.PointLight(0xffb870, 0.8, 3, 2);           // table lamp beside her
+lamp.position.set(0.62, 0.92, -2.55); scene.add(lamp);
+
+// ---------- occluders (chair, stick, side table) ----------
+loader.loadAsync('assets/room_proxies.glb').then((g) => {
+  const occ = new THREE.MeshBasicMaterial({ colorWrite: false });
+  g.scene.traverse((o) => { if (o.isMesh) { o.material = occ; o.renderOrder = -1; } });
+  scene.add(g.scene);
+}).catch((e) => console.warn('no proxies', e));
+
+// ---------- Glenda ----------
+let mixer = null, glendaReady = false;
+const B = {};                                       // bones we animate
+loader.loadAsync('assets/glenda.glb').then((g) => {
+  const o = g.scene;
+  o.traverse((c) => {
+    if (c.isBone) { B[c.name] = c; B[c.name.replace(/[.\s]/g, '')] = c; }
+    if (!c.isMesh) return;
+    c.frustumCulled = false;
+    const m = c.material; if (!m) return;
+    m.envMapIntensity = 1.4;
+    const cutout = /short02|hair|eyebrow|eyelash/i.test(m.name);
+    m.transparent = false; m.depthWrite = true; m.alphaTest = cutout ? 0.45 : 0;
+    if (!cutout) m.alphaMap = null;
+    m.side = cutout || /skirt|sweater/i.test(m.name) ? THREE.DoubleSide : THREE.FrontSide;
+    if (/body/i.test(m.name)) m.roughness = 0.55;
+    if (/skirt|sweater|flats/i.test(m.name)) { m.roughness = 0.95; m.metalness = 0; }
+    m.needsUpdate = true;
+  });
+  scene.add(o);
+  // Mixamo body clips (retargeted in Blender): Idle loops, Talking plays while she speaks, RubbingArm now and then
+  mixer = new THREE.AnimationMixer(o);
+  for (const c of g.animations) {
+    const a = mixer.clipAction(c); CLIPS[c.name] = a;
+    c.tracks.forEach(tr => animatedBones.add(tr.name.split('.')[0]));
+    if (c.name === 'RubbingArm') { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = false; }
+  }
+  if (CLIPS.Idle) { CLIPS.Idle.play(); current = CLIPS.Idle; }
+  else if (g.animations[0]) { current = mixer.clipAction(g.animations[0]); current.play(); }
+  mixer.addEventListener('finished', (e) => { if (e.action === CLIPS.RubbingArm) crossTo(talking() ? CLIPS.Talking : CLIPS.Idle, 0.8); });
+  if (P.get('clip') && CLIPS[P.get('clip')]) { current.stop(); current = CLIPS[P.get('clip')]; current.play(); }   // clip=Talking for checking
+  mixer.update(0);
+  // remember the resting rotation of the face bones we drive by hand, so the offsets never accumulate
+  for (const n of FACE_BONES) if (B[n]) baseQ[n] = B[n].quaternion.clone();
+  glendaReady = true;
+  console.log('glenda loaded; clips:', g.animations.map(c => c.name + ' ' + c.duration.toFixed(1) + 's').join(', '),
+              '; face bones:', FACE_BONES.map(n => n + (B[n] ? ' ok' : ' MISSING')).join(', '));
+}).catch((e) => { glendaReady = true; console.warn('glenda.glb missing', e); });
+
+// ---------- body clips, blinking, jaw ----------
+const CLIPS = {}, animatedBones = new Set(), baseQ = {};
+const FACE_BONES = ['jaw', 'orbicularis03L', 'orbicularis03R'];
+let current = null, nextRub = 45 + Math.random() * 30;
+function crossTo(action, secs = 0.6) {
+  if (!action || action === current) return;
+  action.reset(); action.enabled = true; action.setEffectiveWeight(1); action.play();
+  if (current) current.crossFadeTo(action, secs, false);
+  current = action;
+}
+const talking = () => audioEl && !audioEl.paused && !audioEl.ended;
+const q = new THREE.Quaternion(), eu = new THREE.Euler();
+function setFace(name, x) {           // rest rotation (or the clip's) times a small offset
+  const bone = B[name]; if (!bone) return;
+  if (!animatedBones.has(bone.name) && baseQ[name]) bone.quaternion.copy(baseQ[name]);
+  eu.set(x, 0, 0); q.setFromEuler(eu); bone.quaternion.multiply(q);
+}
+let nextBlink = 2, blinkT = -1, talkEnv = 0, wasTalking = false;
+const JAW_SIGN = parseFloat(P.get('jawsign') || '1');
+const LID_SIGN = parseFloat(P.get('lidsign') || '1');
+function animate(t, dt) {
+  // switch body clips: talking while her audio plays, idle otherwise, an arm rub every minute or so
+  const tk = talking();
+  if (tk && !wasTalking) crossTo(CLIPS.Talking, 0.5);
+  if (!tk && wasTalking) crossTo(CLIPS.Idle, 1.0);
+  wasTalking = tk;
+  if (!tk && t > nextRub && current === CLIPS.Idle && CLIPS.RubbingArm) { crossTo(CLIPS.RubbingArm, 0.8); nextRub = t + 50 + Math.random() * 40; }
+  // blink every 2.5-6 s
+  if (t > nextBlink && blinkT < 0) { blinkT = 0; nextBlink = t + 2.5 + Math.random() * 3.5; }
+  let lid = P.get('blinktest') === '1' ? 1 : 0;
+  if (blinkT >= 0) { blinkT += dt; lid = Math.sin(Math.min(1, blinkT / 0.16) * Math.PI); if (blinkT > 0.16) blinkT = -1; }
+  setFace('orbicularis03L', LID_SIGN * 0.45 * lid); setFace('orbicularis03R', LID_SIGN * 0.45 * lid);
+  // jaw follows the loudness of her voice
+  const lvl = speechLevel();
+  talkEnv += (lvl > talkEnv ? 0.6 : 0.15) * (lvl - talkEnv);
+  const jtest = P.get('jawtest') === '1' ? 1 : 0;
+  setFace('jaw', JAW_SIGN * 0.22 * Math.max(talkEnv, jtest));
+}
+
+// ---------- audio / branching dialogue / remote control ----------
+// dialogue.json: nodes with audio takes; a node either flows on to 'next' or asks a question and waits for Yes/No.
+// Input: the remote control page (control.html via server.py), or keys in the scene:
+//   Space/Enter start (or continue)   Y yes   N no   R replay   T new take   S stop   H status display
+let actx = null, analyser = null, audioEl = null, buf = null;
+let DLG = { nodes: {} }, node = null, take = 0, state = 'idle';     // idle | speaking | waiting | ended
+fetch('dialogue.json', { cache: 'no-store' }).then(r => r.json()).then(d => { DLG = d; updateHud(); pushState(); }).catch(() => {});
+function speechLevel() {
+  if (!analyser || !audioEl || audioEl.paused) return 0;
+  analyser.getFloatTimeDomainData(buf);
+  let s = 0; for (let i = 0; i < buf.length; i++) s += buf[i] * buf[i];
+  return Math.min(1, Math.max(0, (Math.sqrt(s / buf.length) - 0.015) * 7));
+}
+function ensureAudio() {
+  if (actx) { actx.resume(); return; }
+  actx = new AudioContext(); analyser = actx.createAnalyser(); analyser.fftSize = 1024;
+  buf = new Float32Array(analyser.fftSize);
+  audioEl = new Audio();
+  const src = actx.createMediaElementSource(audioEl); src.connect(analyser); analyser.connect(actx.destination);
+  audioEl.addEventListener('ended', () => onLineEnded(lineToken));
+  audioEl.addEventListener('error', () => {
+    const n = DLG.nodes[node]; if (!n || state !== 'speaking') return;
+    console.warn('could not load', audioEl.src);
+    if (++failCount < n.audio.length) play(node, take + 1, true);
+    else { failCount = 0; const tok = lineToken; setTimeout(() => onLineEnded(tok), 800); }
+  });
+  // safety net: if the audio is blocked or the clip never reports 'ended', move on after its length anyway
+  audioEl.addEventListener('loadedmetadata', () => {
+    const tok = lineToken; clearTimeout(watchdog);
+    watchdog = setTimeout(() => onLineEnded(tok), (audioEl.duration + 1.5) * 1000);
+  });
+}
+let lineToken = 0, watchdog = null, failCount = 0;
+function play(id, takeIdx = null, retry = false) {
+  if (!retry) failCount = 0;
+  const n = DLG.nodes[id]; if (!n) { console.warn('no dialogue node', id); return; }
+  ensureAudio();
+  lineToken++; clearTimeout(watchdog);
+  node = id; take = takeIdx === null ? Math.floor(Math.random() * n.audio.length) : ((takeIdx % n.audio.length) + n.audio.length) % n.audio.length;
+  audioEl.src = n.audio[take]; audioEl.currentTime = 0;
+  // fallback until the clip reports its length: estimate from the line's text, so the scene never stalls
+  const tok = lineToken;
+  watchdog = setTimeout(() => onLineEnded(tok), (3 + (n.text || '').length / 12) * 1000);
+  audioEl.play().catch(err => console.warn('audio needs a click or key press first', err));
+  state = 'speaking'; updateHud(); pushState();
+}
+function onLineEnded(tok) {
+  if (tok !== lineToken || state !== 'speaking') return;     // stale or already handled
+  clearTimeout(watchdog);
+  const n = DLG.nodes[node]; if (!n) return;
+  if (n.yes || n.no) { state = 'waiting'; }
+  else if (n.next) { setTimeout(() => play(n.next), 700); return; }
+  else { state = 'ended'; }
+  updateHud(); pushState();
+}
+// who answered what: the first answer to each question wins; it's shown on every remote and logged by the server
+let run = 0, history = [], lastAnswer = null;
+function answer(yes, who = 'Keyboard') {
+  const n = DLG.nodes[node];
+  if (state !== 'waiting' || !n) return;
+  const to = yes ? n.yes : n.no;
+  if (!to) return;
+  lastAnswer = { who, answer: yes ? 'Yes' : 'No', node, ask: n.ask || n.label || node, t: Date.now() };
+  history.push(lastAnswer);
+  fetch('/api/answer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ run, ...lastAnswer }) }).catch(() => {});
+  play(to);
+}
+function command(cmd, who) {
+  switch (cmd) {
+    case 'start': if (state === 'waiting') return; run = Date.now(); history = []; lastAnswer = null; play(DLG.start || Object.keys(DLG.nodes)[0]); break;
+    case 'yes': answer(true, who); break;
+    case 'no': answer(false, who); break;
+    case 'replay': if (node) play(node, take); break;
+    case 'take': if (node) play(node, take + 1); break;
+    case 'stop': if (audioEl) audioEl.pause(); lineToken++; clearTimeout(watchdog); state = 'idle'; updateHud(); pushState(); break;
+  }
+}
+addEventListener('keydown', (ev) => {
+  const k = ev.key.toLowerCase();
+  if (k === ' ' || k === 'enter') command(state === 'waiting' ? '' : 'start');
+  else if (k === 'y') command('yes');
+  else if (k === 'n') command('no');
+  else if (k === 'r') command('replay');
+  else if (k === 't') command('take');
+  else if (k === 's') command('stop');
+  else if (k === 'h') { SHOW_HUD = !SHOW_HUD; updateHud(); }
+});
+addEventListener('click', () => { if (actx) actx.resume(); });
+if (P.get('say')) setTimeout(() => play(P.get('say')), 1000 * parseFloat(P.get('delay') || '2'));
+
+// remote control: poll the server for button presses, and report what's happening so the remote can show it
+let lastCmd = null, remoteOK = false;
+async function pollRemote() {
+  try {
+    const r = await fetch('/api/poll?since=' + (lastCmd ?? 0), { cache: 'no-store' });
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json(); remoteOK = true;
+    if (lastCmd === null) lastCmd = d.latest;            // ignore presses made before the scene loaded
+    else for (const c of d.commands) { lastCmd = c.id; command(c.cmd, c.name || 'Someone'); }
+  } catch (e) { remoteOK = false; }
+  setTimeout(pollRemote, remoteOK ? 150 : 3000);
+}
+function pushState() {
+  const n = DLG.nodes[node] || {};
+  fetch('/api/state', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ node, status: state, waiting: state === 'waiting', ask: n.ask || '', label: n.label || '', text: n.text || '', fps, res: `${innerWidth}x${innerHeight}`, run, history, lastAnswer }) }).catch(() => {});
+}
+pollRemote(); setInterval(pushState, 1000);
+
+// ---------- six-camera capture of Glenda, composited over the panorama ----------
+const EYE_POS = new THREE.Vector3(0, EYE, 0);
+const FACES = [[[1,0,0],[0,1,0]], [[-1,0,0],[0,1,0]], [[0,1,0],[0,0,1]], [[0,-1,0],[0,0,-1]], [[0,0,1],[0,1,0]], [[0,0,-1],[0,1,0]]];
+const faceCams = [], faceRTs = [], faceVP = [];
+for (const [d, up] of FACES) {
+  const cam = new THREE.PerspectiveCamera(90, 1, 0.05, 30);
+  cam.up.set(...up); cam.position.copy(EYE_POS); cam.lookAt(EYE_POS.x + d[0], EYE_POS.y + d[1], EYE_POS.z + d[2]); cam.updateMatrixWorld(true);
+  faceCams.push(cam);
+  faceRTs.push(new THREE.WebGLRenderTarget(CUBE, CUBE, { type: THREE.HalfFloatType, generateMipmaps: false }));
+  faceVP.push(new THREE.Matrix4().multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
+}
+// Glenda sits to the north, below eye level: only the north, down and side faces can see her
+const LIVE_FACES = [0, 1, 3, 5];
+function renderFaces() {
+  renderer.setClearColor(0x000000, 0);
+  for (let i = 0; i < 6; i++) {
+    renderer.setRenderTarget(faceRTs[i]);
+    if (LIVE_FACES.includes(i)) { renderer.clear(); renderer.render(scene, faceCams[i]); } else if (!faceRTs[i].cleared) { renderer.clear(); faceRTs[i].cleared = true; }
+  }
+  renderer.setRenderTarget(null);
+}
+const quadScene = new THREE.Scene(), quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+const projMat = new THREE.ShaderMaterial({
+  uniforms: { pano: { value: null }, f0: { value: faceRTs[0].texture }, f1: { value: faceRTs[1].texture }, f2: { value: faceRTs[2].texture },
+              f3: { value: faceRTs[3].texture }, f4: { value: faceRTs[4].texture }, f5: { value: faceRTs[5].texture },
+              vp: { value: faceVP }, eyePos: { value: EYE_POS },
+              mode: { value: MODE }, vfov: { value: VFOV }, yaw: { value: yaw }, flip: { value: FLIP } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+  fragmentShader: `
+    precision highp float;
+    uniform sampler2D pano, f0, f1, f2, f3, f4, f5;
+    uniform mat4 vp[6]; uniform vec3 eyePos;
+    uniform int mode; uniform float vfov, yaw, flip;
+    varying vec2 vUv;
+    const float PI = 3.141592653589793;
+    vec2 faceUV(mat4 m, vec3 d) { vec4 c = m * vec4(eyePos + d, 1.0); return clamp(c.xy / c.w * 0.5 + 0.5, 0.0005, 0.9995); }
+    void main() {
+      float lon = (vUv.x - 0.5) * 2.0 * PI * flip + yaw;
+      vec3 d;
+      if (mode == 0) { float lat = (vUv.y - 0.5) * PI; d = vec3(sin(lon) * cos(lat), sin(lat), -cos(lon) * cos(lat)); }
+      else { float y = (vUv.y - 0.5) * 2.0 * tan(vfov * 0.5); d = normalize(vec3(sin(lon), y, -cos(lon))); }
+      // the room: Cycles panorama (Blender convention - north at the image centre, east to the right)
+      vec2 puv = vec2(0.5 + atan(d.x, -d.z) / (2.0 * PI), 0.5 + asin(clamp(d.y, -1.0, 1.0)) / PI);
+      vec3 room = texture2D(pano, puv).rgb;
+      // Glenda: live, tone-mapped to match the panorama
+      vec3 a = abs(d); vec4 g;
+      if (a.x >= a.y && a.x >= a.z) g = d.x > 0.0 ? texture2D(f0, faceUV(vp[0], d)) : texture2D(f1, faceUV(vp[1], d));
+      else if (a.y >= a.z)          g = d.y > 0.0 ? texture2D(f2, faceUV(vp[2], d)) : texture2D(f3, faceUV(vp[3], d));
+      else                          g = d.z > 0.0 ? texture2D(f4, faceUV(vp[4], d)) : texture2D(f5, faceUV(vp[5], d));
+      vec3 glenda = toneMapping(max(g.rgb, vec3(0.0)));
+      gl_FragColor = vec4(mix(room, glenda, clamp(g.a, 0.0, 1.0)), 1.0);
+      #include <colorspace_fragment>
+    }`,
+  depthTest: false, depthWrite: false, toneMapped: true,
+});
+quadScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), projMat));
+panoReady.then((t) => { projMat.uniforms.pano.value = t; });
+
+// close-up camera for checking the character (persp=1)
+const PERSP = P.get('persp') ? new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.05, 30) : null;
+if (PERSP && P.get('persp') === 'face') { PERSP.position.set(0.05, 1.15, -1.7); PERSP.lookAt(0.03, 1.1, -2.25); }
+else if (PERSP) { PERSP.position.set(0.3, 1.35, -0.5); PERSP.lookAt(0, 0.75, -2.15); }
+
+// ---------- loop ----------
+const hud = document.getElementById('hud');
+let frames = 0, fps = 0, fpsT = performance.now(), t = 0;
+function updateHud() {
+  hud.style.display = SHOW_HUD ? 'block' : 'none';
+  if (!SHOW_HUD) return;
+  const n = DLG.nodes[node] || {};
+  hud.textContent = `${innerWidth}x${innerHeight}  ${MODE ? 'cylinder' : 'equirect'}  ${fps} fps   remote: ${remoteOK ? 'connected' : 'off'}\n` +
+    `state: ${state}   node: ${node || '-'}${node ? '  (take ' + (take + 1) + '/' + (n.audio || []).length + ')' : ''}\n` +
+    (state === 'waiting' ? `asking: ${n.ask || '?'}   ->  Y / N\n` : '') +
+    (lastAnswer ? `last answer: ${lastAnswer.who} said ${lastAnswer.answer} to "${lastAnswer.ask}"\n` : '') +
+    `Space start   Y yes   N no   R replay   T new take   S stop   H hide`;
+}
+function resize() { renderer.setSize(innerWidth, innerHeight, false);
+  renderer.domElement.style.width = innerWidth + 'px'; renderer.domElement.style.height = innerHeight + 'px';
+  if (PERSP) { PERSP.aspect = innerWidth / innerHeight; PERSP.updateProjectionMatrix(); } }
+addEventListener('resize', resize); resize();
+
+const clock = new THREE.Clock();
+let stillAdvance = parseFloat(P.get('t') || '0');
+function tick() {
+  let dt = Math.min(clock.getDelta(), 0.1);
+  if (STILL) { dt = stillAdvance; stillAdvance = 0; }      // still=1&t=12: jump the animation to 12 s for checking
+  t += dt;
+  if (mixer) mixer.update(dt);           // body clips
+  if (glendaReady) animate(t, dt);       // clip switching, blinking and jaw on top
+  projMat.uniforms.yaw.value = yaw;
+  if (PERSP) {
+    renderer.setRenderTarget(null); renderer.setClearColor(0x777777, 1); renderer.render(scene, PERSP);
+  } else { renderFaces(); renderer.render(quadScene, quadCam); }
+  frames++; const now = performance.now(); if (now - fpsT > 1000) { fps = frames; frames = 0; fpsT = now; if (SHOW_HUD) updateHud(); }
+  if (!STILL) requestAnimationFrame(tick);
+}
+if (STILL) {
+  Promise.all([panoReady, new Promise(r => (function w() { glendaReady ? r() : setTimeout(w, 200); })())])
+    .then(() => setTimeout(() => { tick(); tick(); window.__done = true; }, 800));
+} else requestAnimationFrame(tick);
+updateHud();
+</script>
+</body>
+</html>

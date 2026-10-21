@@ -1,0 +1,27 @@
+# Downloadable or generated - not stored in the repo
+# MakeHuman CC0 asset packs (re-download if needed)
+_mpfb_packs/
+# test renders
+_preview/
+# Poly Haven CC0 assets: python blender_room/fetch_blender_assets.py
+blender_room/assets/
+# old all-three.js room assets: python spout-test/fetch_assets.py spout-test/assets
+spout-test/assets/models/
+spout-test/assets/tex/
+
+# Old versions of the live assets (current: glenda.glb, room_pano.jpg, room_proxies.glb)
+spout-test/assets/*_v[0-9]*.*
+
+# Student names and answers - personal data, never commit
+spout-test/sessions/
+
+# Blender backups and Python caches
+*.blend1
+*.blend2
+__pycache__/
+*.pyc
+
+# OS clutter
+Thumbs.db
+desktop.ini
+.DS_Store

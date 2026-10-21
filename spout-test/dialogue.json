@@ -1,0 +1,66 @@
+{
+  "character": "Glenda",
+  "voice": "ElevenLabs - Beatrice (mature British female), model eleven_v4",
+  "note": "PLACEHOLDER branching test. Replace the nodes with the real dialogue. Each node plays one of its audio takes, then either moves to 'next' automatically or waits for Yes/No.",
+  "start": "hello",
+  "nodes": {
+    "hello": {
+      "label": "Greeting",
+      "text": "Oh, hello love... come in, come in. Sorry I took so long getting to the door, my legs aren't what they were. Welcome to my home. Mind Dizzy, she gets ever so excited when we have visitors. Sit yourself down wherever you can find a space.",
+      "audio": ["audio/G_hello_take1.mp3", "audio/G_hello_take2.mp3", "audio/G_hello_take3.mp3", "audio/G_hello_take4.mp3"],
+      "next": "tea"
+    },
+    "tea": {
+      "label": "Offers tea",
+      "text": "Now then... would you like a cup of tea, love?",
+      "ask": "Would you like a cup of tea?",
+      "audio": ["audio/G_tea_take1.mp3", "audio/G_tea_take2.mp3", "audio/G_tea_take3.mp3", "audio/G_tea_take4.mp3"],
+      "yes": "tea_yes",
+      "no": "tea_no"
+    },
+    "tea_yes": {
+      "label": "Tea: yes",
+      "text": "Lovely. You'll have to make it yourself though, I'm not getting out of this chair today... The kettle's just over there. So... have you come about my legs, then?",
+      "ask": "Have you come about my legs?",
+      "audio": ["audio/G_tea_yes_take1.mp3", "audio/G_tea_yes_take2.mp3", "audio/G_tea_yes_take3.mp3", "audio/G_tea_yes_take4.mp3"],
+      "yes": "legs_yes",
+      "no": "legs_no"
+    },
+    "tea_no": {
+      "label": "Tea: no",
+      "text": "Suit yourself, love. I'd have struggled to get up anyway... So... have you come about my legs, then?",
+      "ask": "Have you come about my legs?",
+      "audio": ["audio/G_tea_no_take1.mp3", "audio/G_tea_no_take2.mp3", "audio/G_tea_no_take3.mp3", "audio/G_tea_no_take4.mp3"],
+      "yes": "legs_yes",
+      "no": "legs_no"
+    },
+    "legs_yes": {
+      "label": "Legs: yes",
+      "text": "Oh, thank goodness. They've been leaking all week... I've had my feet on that towel since Monday, and it's soaked right through. Do you want to see all my tablets?",
+      "ask": "Do you want to see my tablets?",
+      "audio": ["audio/G_legs_yes_take1.mp3", "audio/G_legs_yes_take2.mp3", "audio/G_legs_yes_take3.mp3", "audio/G_legs_yes_take4.mp3"],
+      "yes": "meds_yes",
+      "no": "meds_no"
+    },
+    "legs_no": {
+      "label": "Legs: no",
+      "text": "Oh... I thought the surgery said somebody would look at them. They're leaking, you see, right through to the towel. Do you want to see my tablets, then?",
+      "ask": "Do you want to see my tablets?",
+      "audio": ["audio/G_legs_no_take1.mp3", "audio/G_legs_no_take2.mp3", "audio/G_legs_no_take3.mp3", "audio/G_legs_no_take4.mp3"],
+      "yes": "meds_yes",
+      "no": "meds_no"
+    },
+    "meds_yes": {
+      "label": "Tablets: yes (end)",
+      "text": "They're all over there on the side, the boxes. I don't take the water ones much... they have me running to the loo, and I can't always get there in time. Anyway... thank you for coming, love.",
+      "audio": ["audio/G_meds_yes_take1.mp3", "audio/G_meds_yes_take2.mp3", "audio/G_meds_yes_take3.mp3", "audio/G_meds_yes_take4.mp3"],
+      "next": null
+    },
+    "meds_no": {
+      "label": "Tablets: no (end)",
+      "text": "Fair enough. Half of them I don't take anyway... That heartburn's been bad again when I walk about, I've been living on Gaviscon. Anyway... thank you for coming, love.",
+      "audio": ["audio/G_meds_no_take1.mp3", "audio/G_meds_no_take2.mp3", "audio/G_meds_no_take3.mp3", "audio/G_meds_no_take4.mp3"],
+      "next": null
+    }
+  }
+}

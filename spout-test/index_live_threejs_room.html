@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Glenda 360 Scene</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  canvas { display: block; }
+  #hud { position: fixed; left: 8px; bottom: 8px; font: 12px monospace; color: #0f0;
+         background: rgba(0,0,0,.6); padding: 4px 8px; pointer-events: none; }
+</style>
+<script type="importmap">
+{ "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="hud"></div>
+<script type="module">
+/*
+  Glenda's living room – 360 output for IglooPreview / Igloo room via Spout.
+  Must be served over http (run start-server.bat), not opened as a file.
+
+  URL parameters (all optional):
+    mode   = equirect (default) | cylinder
+    vfov   = vertical field of view in degrees, cylinder mode only (default 60)
+    cube   = cube face resolution (default 1536)
+    spin   = degrees per second to rotate the view (default 0)
+    yaw    = starting heading offset in degrees (default 0)
+    flip   = 1 to mirror horizontally
+    glendaYaw = turn Glenda in degrees (default 18)
+    eye    = virtual eye height in metres (default 1.6) – match the room's horizon
+    hud    = 1 to show status text
+    grid   = 1 to show the compass calibration ring
+    shadows= 0 to turn shadows off (faster)
+
+  Glenda: drop a model at assets/glenda.glb and it replaces the stand-in figure.
+*/
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const P = new URLSearchParams(location.search);
+const MODE = P.get('mode') === 'cylinder' ? 1 : 0;
+const VFOV = THREE.MathUtils.degToRad(parseFloat(P.get('vfov') || '60'));
+const CUBE = parseInt(P.get('cube') || '1536', 10);
+const SPIN = parseFloat(P.get('spin') || '0');
+let yaw = THREE.MathUtils.degToRad(parseFloat(P.get('yaw') || '0'));
+const FLIP = P.get('flip') === '1' ? -1 : 1;
+const SHOW_HUD = P.get('hud') === '1';
+const SHOW_GRID = P.get('grid') === '1';
+const SHADOWS = P.get('shadows') !== '0';
+
+// ---------- renderer ----------
+const renderer = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = parseFloat(P.get('exposure') || '1.45');
+renderer.shadowMap.enabled = SHADOWS;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x111111);
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(renderer), 0.04).texture;
+scene.environmentIntensity = 0.35;   // soft bounce light (r160 ignores this; set per material below)
+
+// ---------- room dimensions (metres) ----------
+// viewer stands in the middle of the room; north (-Z) is straight ahead
+// matched to the physical room (ARUP_RoomModel): 6.40 m E-W, 5.71 m N-S, 2.244 m walls
+const EYE = parseFloat(P.get('eye') || '1.6');
+const X0 = -3.2, X1 = 3.2, Z0 = -2.855, Z1 = 2.855, RH = 2.244;
+const RW = X1 - X0, RD = Z1 - Z0;
+
+// ---------- texture helpers ----------
+const texLoader = new THREE.TextureLoader();
+function pbr(name, repX, repY, opts = {}) {
+  const load = (suffix, srgb) => {
+    const t = texLoader.load(`assets/tex/${name}_${suffix}.jpg`);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repX, repY);
+    t.anisotropy = 8; if (srgb) t.colorSpace = THREE.SRGBColorSpace; return t;
+  };
+  return new THREE.MeshStandardMaterial({
+    map: load('diff', true), normalMap: load('nor', false), roughnessMap: load('rough', false),
+    envMapIntensity: 0.35, ...opts });
+}
+const std = (color, rough = 0.8, extra = {}) =>
+  new THREE.MeshStandardMaterial({ color, roughness: rough, envMapIntensity: 0.35, ...extra });
+
+function mesh(geo, mat, x, y, z, ry = 0, cast = true, receive = true) {
+  const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.y = ry;
+  m.castShadow = cast; m.receiveShadow = receive; scene.add(m); return m;
+}
+const boxM = (w, h, d, mat, x, y, z, ry = 0) => mesh(new THREE.BoxGeometry(w, h, d), mat, x, y, z, ry);
+
+// ---------- shell: floor, walls, ceiling ----------
+const carpet = pbr('dirty_carpet', RW / 1.6, RD / 1.6, { color: 0xb8a890 });
+const floor = mesh(new THREE.PlaneGeometry(RW, RD), carpet, 0, 0, 0, 0, false, true);
+floor.rotation.x = -Math.PI / 2;
+
+// kitchen lino on the east side
+const lino = pbr('old_linoleum_flooring_01', 1.4, 3.2);
+const kFloor = mesh(new THREE.PlaneGeometry(1.15, RD), lino, X1 - 0.575, 0.003, 0, 0, false, true);
+kFloor.rotation.x = -Math.PI / 2;
+
+const ceilMat = pbr('ceiling_interior', RW / 2, RD / 2, { color: 0xffffff, normalScale: new THREE.Vector2(0.25, 0.25) });
+const ceil = mesh(new THREE.PlaneGeometry(RW, RD), ceilMat, 0, RH, 0, 0, false, true);
+ceil.rotation.x = Math.PI / 2;
+
+const wallpaper = (w) => pbr('decrepit_wallpaper', w / 1.8, RH / 1.8, { color: 0xfff3dc });
+function wall(w, x, z, ry) {
+  const m = mesh(new THREE.PlaneGeometry(w, RH), wallpaper(w), x, RH / 2, z, ry, false, true);
+  return m;
+}
+wall(RW, 0, Z0, 0);                 // north
+wall(RW, 0, Z1, Math.PI);           // south
+wall(RD, X1, 0, -Math.PI / 2);      // east
+// west wall is built in pieces around the window
+const WIN_Z = -0.5, WIN_W = 1.3, WIN_SILL = 0.9, WIN_H = 1.25;
+{
+  const zA = WIN_Z - WIN_W / 2, zB = WIN_Z + WIN_W / 2;
+  const seg = (z0, z1, y0, y1) => {
+    const w = z1 - z0, h = y1 - y0;
+    const m = mesh(new THREE.PlaneGeometry(w, h),
+      pbr('decrepit_wallpaper', w / 1.8, h / 1.8, { color: 0xfff3dc }),
+      X0, (y0 + y1) / 2, (z0 + z1) / 2, Math.PI / 2, false, true);
+    return m;
+  };
+  seg(Z0, zA, 0, RH); seg(zB, Z1, 0, RH);
+  seg(zA, zB, 0, WIN_SILL); seg(zA, zB, WIN_SILL + WIN_H, RH);
+}
+
+// skirting boards & coving
+const gloss = std(0xf1ede2, 0.35);
+boxM(RW, 0.12, 0.02, gloss, 0, 0.06, Z0 + 0.01);
+boxM(RW, 0.12, 0.02, gloss, 0, 0.06, Z1 - 0.01);
+boxM(0.02, 0.12, RD, gloss, X1 - 0.01, 0.06, 0);
+boxM(0.02, 0.12, RD, gloss, X0 + 0.01, 0.06, 0);
+
+// ---------- window (west) – uPVC frame, net curtain, daylight ----------
+{
+  const upvc = std(0xf4f4f0, 0.3);
+  const cz = WIN_Z, cy = WIN_SILL + WIN_H / 2;
+  boxM(0.12, 0.06, WIN_W + 0.1, upvc, X0 + 0.03, WIN_SILL - 0.03, cz);        // sill
+  boxM(0.07, 0.06, WIN_W, upvc, X0 + 0.02, WIN_SILL + WIN_H, cz);             // head
+  boxM(0.07, WIN_H, 0.06, upvc, X0 + 0.02, cy, cz - WIN_W / 2);
+  boxM(0.07, WIN_H, 0.06, upvc, X0 + 0.02, cy, cz + WIN_W / 2);
+  boxM(0.07, WIN_H, 0.05, upvc, X0 + 0.02, cy, cz);                            // mullion
+  // bright overcast sky behind the glass
+  mesh(new THREE.PlaneGeometry(WIN_W, WIN_H), new THREE.MeshBasicMaterial({ color: 0xdfe6ee }),
+       X0 - 0.05, cy, cz, Math.PI / 2, false, false);
+  // net curtain
+  const nc = document.createElement('canvas'); nc.width = nc.height = 128;
+  const g = nc.getContext('2d'); g.fillStyle = 'rgba(255,255,255,0.55)'; g.fillRect(0, 0, 128, 128);
+  g.strokeStyle = 'rgba(255,255,255,0.9)'; for (let i = 0; i < 128; i += 8) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i, 128); g.stroke(); }
+  const nt = new THREE.CanvasTexture(nc); nt.wrapS = nt.wrapT = THREE.RepeatWrapping; nt.repeat.set(10, 1);
+  mesh(new THREE.PlaneGeometry(WIN_W, WIN_H * 0.7), new THREE.MeshStandardMaterial({
+      map: nt, transparent: true, side: THREE.DoubleSide, roughness: 1, emissive: 0x999999, emissiveMap: nt }),
+       X0 + 0.07, WIN_SILL + WIN_H * 0.35, cz, Math.PI / 2, false, false);
+}
+
+// ---------- lighting ----------
+// daylight through the west window
+const sun = new THREE.DirectionalLight(0xe9eef5, 2.2);
+sun.position.set(X0 - 3, 3.0, WIN_Z - 0.5);
+sun.target.position.set(0.5, 0, -0.5);
+sun.castShadow = SHADOWS;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -4, right: 4, top: 4, bottom: -4, near: 0.5, far: 12 });
+sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.02;
+scene.add(sun, sun.target);
+// soft window fill
+const fill = new THREE.PointLight(0xdfe8f2, 6, 6, 2); fill.position.set(X0 + 0.6, 1.5, WIN_Z); scene.add(fill);
+// central pendant – a dim, warm 40W bulb
+const pendant = new THREE.PointLight(0xffcf8a, 9, 8, 2);
+pendant.position.set(0, RH - 0.15, -0.3);
+pendant.castShadow = SHADOWS; pendant.shadow.mapSize.set(1024, 1024); pendant.shadow.bias = -0.002;
+scene.add(pendant);
+scene.add(new THREE.HemisphereLight(0xfff4e6, 0x5a4a3a, 0.7));
+// pendant fitting: flex + fabric shade
+// flush ceiling light (a hanging shade sits too close to the 360 camera and looks huge)
+mesh(new THREE.CylinderGeometry(0.17, 0.2, 0.06, 32),
+     std(0xf3eadb, 0.6, { emissive: 0xffd9a0, emissiveIntensity: 0.35 }), 0, RH - 0.03, -0.3, 0, false, false);
+
+// ---------- printed-label helper (medication boxes, bottles) ----------
+function labelTex(lines, stripe, w = 512, h = 256) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const g = c.getContext('2d');
+  g.fillStyle = '#f7f7f4'; g.fillRect(0, 0, w, h);
+  g.fillStyle = stripe; g.fillRect(0, 0, w, h * 0.22);
+  g.fillStyle = '#222'; g.font = `bold ${h * 0.17}px Arial`; g.fillText(lines[0], w * 0.06, h * 0.45);
+  g.font = `${h * 0.12}px Arial`; if (lines[1]) g.fillText(lines[1], w * 0.06, h * 0.63);
+  // pharmacy dispensing sticker
+  g.fillStyle = '#fff'; g.fillRect(w * 0.05, h * 0.7, w * 0.9, h * 0.25);
+  g.strokeStyle = '#999'; g.strokeRect(w * 0.05, h * 0.7, w * 0.9, h * 0.25);
+  g.fillStyle = '#444'; g.font = `${h * 0.075}px Arial`;
+  g.fillText('Mrs G. ----   TAKE AS DIRECTED', w * 0.08, h * 0.8);
+  g.fillText('Keep out of reach of children', w * 0.08, h * 0.9);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
+}
+const MEDS = [
+  ['Furosemide 40mg', '28 tablets', '#2a6fb5'],
+  ['Bisoprolol 2.5mg', '28 film-coated tablets', '#c0392b'],
+  ['Ramipril 5mg', '28 capsules', '#7d3c98'],
+  ['Metformin 500mg', '56 tablets', '#16a085'],
+  ['Aspirin 75mg', 'Dispersible - 28', '#e67e22'],
+  ['Co-codamol / Codeine', '32 tablets', '#7f8c8d'],
+].map(([a, b, s]) => std(0xffffff, 0.6, { map: labelTex([a, b], s) }));
+function medBox(x, y, z, ry = 0, i = 0) {
+  return boxM(0.135, 0.05, 0.075, MEDS[i % MEDS.length], x, y + 0.025, z, ry);
+}
+function gaviscon(x, z, y = 0) {
+  const t = labelTex(['Gaviscon', 'Peppermint 500ml'], '#1e8449', 512, 256);
+  const b = mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.19, 20),
+    [std(0xffffff, 0.4, { map: t }), std(0x1e8449, 0.4), std(0x1e8449, 0.4)], x, y + 0.095, z, Math.random() * 6);
+  mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.03, 16), std(0x1e8449, 0.4), x, y + 0.205, z);
+  return b;
+}
+function rennie(x, y, z, ry = 0) {
+  return boxM(0.1, 0.03, 0.06, std(0xffffff, 0.6, { map: labelTex(['Rennie', 'Peppermint 48'], '#27ae60') }), x, y + 0.015, z, ry);
+}
+
+// ---------- GLTF props ----------
+const gltf = new GLTFLoader();
+const cache = {};
+function prop(name, { x = 0, z = 0, y = 0, ry = 0, scale = 1, fitH = 0, fitW = 0, tint = null } = {}) {
+  const url = `assets/models/${name}/${name}.gltf`;
+  cache[url] ??= gltf.loadAsync(url);
+  return cache[url].then((g) => {
+    const o = g.scene.clone(true);
+    o.traverse((c) => { if (c.isMesh) {
+      c.castShadow = c.receiveShadow = true;
+      if (c.material) { c.material = c.material.clone(); c.material.envMapIntensity = 0.35;
+        if (tint) c.material.color.multiply(new THREE.Color(tint)); }
+    } });
+    let s = scale;
+    const b0 = new THREE.Box3().setFromObject(o), sz = b0.getSize(new THREE.Vector3());
+    if (fitH) s = fitH / sz.y; if (fitW) s = fitW / Math.max(sz.x, sz.z);
+    o.scale.setScalar(s); o.rotation.y = ry;
+    o.updateMatrixWorld(true);
+    const b = new THREE.Box3().setFromObject(o), c = b.getCenter(new THREE.Vector3());
+    o.position.set(x - c.x, y - b.min.y, z - c.z);
+    scene.add(o); return o;
+  }).catch((e) => console.warn('prop failed', name, e));
+}
+
+// ---------- NORTH: Glenda's armchair corner ----------
+const CHAIR = { x: 0, z: -2.25 };
+prop('ArmChair_01', { x: CHAIR.x, z: CHAIR.z, tint: 0xcfc2b0 });
+prop('throw_pillows_01', { x: CHAIR.x + 0.25, z: CHAIR.z - 0.12, y: 0.45, scale: 0.75, ry: 0.3 });
+// side table with medication pile, Gaviscon, glass, photo of her son
+prop('side_table_01', { x: 0.75, z: -2.45 });
+const ST = 0.555;
+for (let i = 0; i < 7; i++)
+  medBox(0.66 + (i % 2) * 0.1, ST + Math.floor(i / 2) * 0.05, -2.48 + ((i * 37) % 5 - 2) * 0.02, (i * 0.7) % 0.6 - 0.3, i);
+gaviscon(0.9, -2.32, ST);
+rennie(0.88, ST, -2.6, 0.4);
+prop('standing_picture_frame_01', { x: 0.95, z: -2.6, y: ST, ry: -0.5 });
+// towel under her feet, already wet
+{
+  const c = document.createElement('canvas'); c.width = 256; c.height = 256;
+  const g = c.getContext('2d'); g.fillStyle = '#d9cdb4'; g.fillRect(0, 0, 256, 256);
+  g.fillStyle = '#9b8a6a'; g.fillRect(0, 30, 256, 14); g.fillRect(0, 212, 256, 14);
+  const grd = g.createRadialGradient(128, 128, 10, 128, 128, 120); grd.addColorStop(0, 'rgba(120,110,80,.55)'); grd.addColorStop(1, 'rgba(120,110,80,0)');
+  g.fillStyle = grd; g.fillRect(0, 0, 256, 256);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const towel = mesh(new THREE.BoxGeometry(0.75, 0.012, 0.5), std(0xffffff, 1, { map: t }), CHAIR.x, 0.006, CHAIR.z + 0.65);
+  towel.rotation.y = 0.08;
+}
+// walking stick leaning on the chair
+{
+  const stick = mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.9, 10), std(0x3b2a1a, 0.5), CHAIR.x - 0.5, 0.45, CHAIR.z + 0.2);
+  stick.rotation.z = 0.15;
+  const h = mesh(new THREE.TorusGeometry(0.05, 0.012, 8, 16, Math.PI), std(0x3b2a1a, 0.5), CHAIR.x - 0.57, 0.9, CHAIR.z + 0.2);
+}
+prop('wall_clock', { x: -0.9, z: Z0 + 0.03, y: 1.75 });
+
+// ---------- WEST: hoarding, window, dog bed ----------
+const boxesW = [
+  [-2.95, -2.55, 0, 0.1], [-2.95, -2.55, 1, 0.3], [-2.95, -2.55, 2, 0.0],
+  [-2.5, -2.65, 0, 1.4], [-2.5, -2.65, 1, 1.6],
+  [-2.95, -2.0, 0, 1.6], [-2.95, -2.0, 1, 1.5], [-2.95, -1.5, 0, 0.1],
+  [-2.95, 0.55, 0, 0.2], [-2.9, 0.55, 1, 0.5],
+];
+for (const [x, z, lvl, ry] of boxesW) prop('cardboard_box_01', { x, z, y: lvl * 0.34, ry });
+// stacks of old newspapers
+const paper = std(0xd8d2c2, 0.95);
+for (const [x, z, n] of [[-2.05, -2.7, 9], [-2.95, 1.05, 14], [-2.6, 1.05, 6]])
+  for (let i = 0; i < n; i++) boxM(0.42, 0.028, 0.3, paper, x + (Math.random() - 0.5) * 0.04, 0.014 + i * 0.028, z, (Math.random() - 0.5) * 0.25);
+prop('vintage_cabinet_01', { x: -2.85, z: 2.15, ry: Math.PI / 2, fitH: 2.0 });
+prop('potted_plant_02', { x: -2.98, z: -0.5, y: WIN_SILL, fitH: 0.35, tint: 0x9a8a60 });   // dying plant on the sill
+prop('wicker_basket_01', { x: -1.9, z: 0.7, scale: 1.9, ry: 0.4 });                      // Dizzy's bed
+prop('throw_pillows_01', { x: -1.9, z: 0.7, y: 0.05, scale: 0.8, ry: 1.2 });
+// dog bowls
+mesh(new THREE.CylinderGeometry(0.09, 0.07, 0.05, 24), std(0xb03a2e, 0.4), -1.5, 0.025, 1.2);
+mesh(new THREE.CylinderGeometry(0.09, 0.07, 0.05, 24), std(0xaab0b5, 0.25, { metalness: 0.8 }), -1.3, 0.025, 1.25);
+
+// ---------- SOUTH: front door, TV, rubbish ----------
+{
+  const dx = 1.0, dz = Z1 - 0.02, dw = 0.86, dh = 2.0;
+  const doorMat = std(0xe9e4d6, 0.45);
+  boxM(dw, dh, 0.045, doorMat, dx, dh / 2, dz);
+  for (const [py, ph] of [[0.45, 0.6], [1.35, 0.85]]) {           // raised panels
+    boxM(0.3, ph, 0.012, doorMat, dx - 0.19, py, dz - 0.028);
+    boxM(0.3, ph, 0.012, doorMat, dx + 0.19, py, dz - 0.028);
+  }
+  const frame = std(0xf1ede2, 0.35);
+  boxM(0.07, dh + 0.07, 0.06, frame, dx - dw / 2 - 0.035, (dh + 0.07) / 2, dz - 0.01);
+  boxM(0.07, dh + 0.07, 0.06, frame, dx + dw / 2 + 0.035, (dh + 0.07) / 2, dz - 0.01);
+  boxM(dw + 0.14, 0.07, 0.06, frame, dx, dh + 0.035, dz - 0.01);
+  const brass = std(0xb8963a, 0.3, { metalness: 0.9 });
+  boxM(0.03, 0.18, 0.02, brass, dx - 0.33, 1.0, dz - 0.04);
+  boxM(0.12, 0.02, 0.04, brass, dx - 0.3, 1.02, dz - 0.07);
+  // post / letters piled behind the door
+  for (let i = 0; i < 8; i++) boxM(0.22, 0.004, 0.11, std(i % 3 ? 0xf2efe6 : 0xc9b48a, 0.9),
+    dx + (Math.random() - 0.5) * 0.4, 0.002 + i * 0.004, dz - 0.25 - Math.random() * 0.25, Math.random() * 3);
+}
+prop('trashbag', { x: 0.1, z: 2.55, ry: 0.5 });
+prop('trashbag', { x: -0.35, z: 2.6, ry: 2.2, scale: 0.85 });
+// TV on a low unit in the south-west corner, angled at her chair
+boxM(0.9, 0.5, 0.42, std(0x5a3d26, 0.5), -2.2, 0.25, 2.4, 0.5);
+prop('television_02', { x: -2.2, z: 2.4, y: 0.5, ry: Math.PI + 0.5, scale: 1.35 });
+
+// ---------- EAST: kitchenette ----------
+{
+  const unitMat = std(0xe8e2cf, 0.5), top = std(0x6b6455, 0.35);
+  const kx = X1 - 0.3;
+  boxM(0.6, 0.86, 2.2, unitMat, kx, 0.43, 0.35);
+  boxM(0.64, 0.04, 2.24, top, kx - 0.02, 0.88, 0.35);
+  for (let i = 0; i < 4; i++) {                                         // cupboard doors & handles
+    boxM(0.01, 0.7, 0.5, std(0xddd5bd, 0.45), kx - 0.305, 0.43, -0.4 + i * 0.52);
+    boxM(0.015, 0.12, 0.015, std(0x999999, 0.3, { metalness: 0.8 }), kx - 0.315, 0.66, -0.2 + i * 0.52);
+  }
+  // sink
+  boxM(0.45, 0.02, 0.6, std(0xc8ccd0, 0.2, { metalness: 0.9 }), kx - 0.02, 0.901, 1.05);
+  // wall cupboards
+  boxM(0.33, 0.65, 1.6, unitMat, X1 - 0.17, 1.75, 0.2);
+  prop('vintage_electric_kettle', { x: kx, z: -0.55, y: 0.9, scale: 0.75, ry: -Math.PI / 2 });
+  prop('vintage_microwave', { x: kx + 0.02, z: 0.3, y: 0.9, fitW: 0.5, ry: -Math.PI / 2 });
+  prop('bananas', { x: kx - 0.1, z: -0.15, y: 0.9, tint: 0x5a4a2a, ry: 0.6 });        // blackened, past it
+  // dirty mugs & plates
+  const mug = std(0xe7e0d0, 0.3);
+  for (const [z, c] of [[0.75, 0xe7e0d0], [0.82, 0x2f5f8a], [-0.05, 0xb8423a]])
+    mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.09, 16), std(c, 0.3), kx - 0.15, 0.945, z);
+  mesh(new THREE.CylinderGeometry(0.12, 0.1, 0.02, 24), mug, kx - 0.05, 0.91, 1.05);
+  // fridge in the north-east corner
+  boxM(0.6, 1.45, 0.62, std(0xf0efe9, 0.3), X1 - 0.3, 0.725, Z0 + 0.35);
+  boxM(0.02, 0.3, 0.03, std(0xbbbbbb, 0.3), X1 - 0.61, 1.15, Z0 + 0.62);
+  // more medication boxes piled on the worktop by the kettle
+  for (let i = 0; i < 6; i++) medBox(kx - 0.05 + (i % 2) * 0.02, 0.9 + Math.floor(i / 2) * 0.05, -0.85 + (i % 3) * 0.08, i * 0.4, i + 2);
+  gaviscon(kx - 0.15, -0.95, 0.9);
+}
+prop('painted_wooden_cabinet', { x: X1 - 0.35, z: 2.35, ry: -Math.PI / 2, fitH: 1.3, tint: 0xd8cfb8 });
+
+// ---------- Glenda (stand-in until assets/glenda.glb exists) ----------
+const glenda = new THREE.Group(); scene.add(glenda);
+{
+  const skin = std(0xd9b49a, 0.55), cardigan = std(0x8e6f7a, 0.95), skirt = std(0x37405a, 0.9),
+        legSkin = std(0xc98f84, 0.25, { metalness: 0.0 }),   // swollen, reddened, shiny where weeping
+        hair = std(0xd8d6d0, 0.9), slipper = std(0x5b3b4a, 0.95);
+  const cap = (r, l, m, x, y, z, rx = 0, rz = 0) => {
+    const c = new THREE.Mesh(new THREE.CapsuleGeometry(r, l, 8, 16), m);
+    c.position.set(x, y, z); c.rotation.set(rx, 0, rz); c.castShadow = c.receiveShadow = true; glenda.add(c); return c;
+  };
+  const cz = CHAIR.z;
+  cap(0.2, 0.32, cardigan, 0, 0.82, cz - 0.08, -0.18);                    // torso (slumped back)
+  cap(0.17, 0.12, skirt, 0, 0.56, cz - 0.02, Math.PI / 2);                // hips
+  cap(0.085, 0.38, skirt, -0.1, 0.55, cz + 0.2, Math.PI / 2);             // thighs
+  cap(0.085, 0.38, skirt, 0.1, 0.55, cz + 0.2, Math.PI / 2);
+  cap(0.075, 0.34, legSkin, -0.11, 0.27, cz + 0.45);                      // swollen lower legs
+  cap(0.075, 0.34, legSkin, 0.11, 0.27, cz + 0.45);
+  cap(0.05, 0.12, slipper, -0.11, 0.05, cz + 0.52, Math.PI / 2);          // slippers
+  cap(0.05, 0.12, slipper, 0.11, 0.05, cz + 0.52, Math.PI / 2);
+  cap(0.05, 0.28, cardigan, -0.27, 0.78, cz - 0.02, 0, 0.12);             // arms
+  cap(0.05, 0.28, cardigan, 0.27, 0.78, cz - 0.02, 0, -0.12);
+  cap(0.045, 0.22, cardigan, -0.3, 0.62, cz + 0.15, Math.PI / 2);         // forearms on armrests
+  cap(0.045, 0.22, cardigan, 0.3, 0.62, cz + 0.15, Math.PI / 2);
+  cap(0.05, 0.06, skin, 0, 1.12, cz - 0.1);                               // neck
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.1, 32, 24), skin);
+  head.scale.set(1, 1.15, 1.05); head.position.set(0, 1.27, cz - 0.08); head.castShadow = true; glenda.add(head);
+  const hairM = new THREE.Mesh(new THREE.SphereGeometry(0.108, 32, 24, 0, Math.PI * 2, 0, Math.PI * 0.55), hair);
+  hairM.scale.set(1.05, 1.15, 1.1); hairM.position.set(0, 1.29, cz - 0.1); hairM.rotation.x = -0.3; glenda.add(hairM);
+  glenda.userData.torso = glenda.children[0];
+}
+// try a real model
+let mixer = null, glendaReady = false;
+gltf.loadAsync('assets/glenda.glb').then((g) => {
+  const o = g.scene;
+  // MPFB exports every material as alpha-blended; make skin and clothes opaque, and hair/brows/lashes alpha-cutout
+  o.traverse((c) => { if (!c.isMesh) return;
+    c.castShadow = c.receiveShadow = true; c.frustumCulled = false;
+    const m = c.material; if (!m) return;
+    m.envMapIntensity = 0.35;
+    const cutout = /short02|hair|eyebrow|eyelash|skirt/i.test(m.name);
+    m.transparent = false; m.depthWrite = true;
+    m.alphaTest = cutout ? 0.45 : 0; if (!cutout) m.alphaMap = null;
+    m.side = /hair|short02|skirt|eyebrow|eyelash/i.test(m.name) ? THREE.DoubleSide : THREE.FrontSide;
+    m.needsUpdate = true; });
+  o.rotation.y = THREE.MathUtils.degToRad(parseFloat(P.get('glendaYaw') || '18'));   // her pose turns slightly to her left
+  scene.add(o);
+  if (g.animations.length) { mixer = new THREE.AnimationMixer(o);
+    mixer.clipAction(THREE.AnimationClip.findByName(g.animations, 'Sitting') || g.animations[0]).play(); mixer.update(0); }
+  o.updateMatrixWorld(true);
+  o.traverse((c) => { if (c.isSkinnedMesh) { c.skeleton.update(); c.computeBoundingBox(); } });
+  const b = new THREE.Box3().setFromObject(o), c = b.getCenter(new THREE.Vector3());
+  // feet on the towel, body centred on the armchair
+  o.position.set(CHAIR.x - c.x, 0.012 - b.min.y, CHAIR.z + 0.12 - c.z);
+  glenda.visible = false; glendaReady = true;
+  console.log('glenda.glb loaded', b.min.toArray().map(v=>v.toFixed(2)), b.max.toArray().map(v=>v.toFixed(2)));
+}).catch((e) => { glendaReady = true; console.log('no assets/glenda.glb – using stand-in figure', e && e.message); });
+
+// ---------- optional calibration ring ----------
+if (SHOW_GRID) {
+  const R = 1.4;
+  for (let d = 0; d < 360; d += 30) {
+    const a = THREE.MathUtils.degToRad(d);
+    const c = document.createElement('canvas'); c.width = 256; c.height = 64;
+    const g = c.getContext('2d'); g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(0, 0, 256, 64);
+    g.fillStyle = d % 90 ? '#ddd' : ['#f44', '#4f4', '#48f', '#ff4'][d / 90];
+    g.font = 'bold 40px sans-serif'; g.textAlign = 'center'; g.fillText(({0:'N',90:'E',180:'S',270:'W'}[d] || '') + ' ' + d + '°', 128, 46);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.1), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true }));
+    m.position.set(Math.sin(a) * R, EYE + 0.3, -Math.cos(a) * R); m.rotation.y = -a; scene.add(m);
+  }
+}
+
+// ---------- six-camera capture + 360 projection ----------
+// Six 90° cameras render into ordinary 2D targets (more portable than a cube render target),
+// then a full-screen shader stitches them into an equirectangular or cylindrical frame.
+const RT_TYPE = P.get('hf') === '0' ? THREE.UnsignedByteType : THREE.HalfFloatType;
+const EYE_POS = new THREE.Vector3(0, EYE, 0);
+const FACES = [ // [look direction, up]  order: +X, -X, +Y, -Y, +Z, -Z
+  [[1, 0, 0], [0, 1, 0]], [[-1, 0, 0], [0, 1, 0]], [[0, 1, 0], [0, 0, 1]],
+  [[0, -1, 0], [0, 0, -1]], [[0, 0, 1], [0, 1, 0]], [[0, 0, -1], [0, 1, 0]] ];
+const faceCams = [], faceRTs = [], faceVP = [];
+for (const [d, up] of FACES) {
+  const cam = new THREE.PerspectiveCamera(90, 1, 0.05, 50);
+  cam.up.set(...up); cam.position.copy(EYE_POS);
+  cam.lookAt(EYE_POS.x + d[0], EYE_POS.y + d[1], EYE_POS.z + d[2]);
+  cam.updateMatrixWorld(true);
+  faceCams.push(cam);
+  faceRTs.push(new THREE.WebGLRenderTarget(CUBE, CUBE, { type: RT_TYPE, generateMipmaps: false,
+    minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter }));
+  faceVP.push(new THREE.Matrix4().multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
+}
+function renderFaces() {
+  for (let i = 0; i < 6; i++) { renderer.setRenderTarget(faceRTs[i]); renderer.render(scene, faceCams[i]); }
+  renderer.setRenderTarget(null);
+}
+
+const quadScene = new THREE.Scene();
+const quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+const projMat = new THREE.ShaderMaterial({
+  uniforms: { f0: { value: faceRTs[0].texture }, f1: { value: faceRTs[1].texture }, f2: { value: faceRTs[2].texture },
+              f3: { value: faceRTs[3].texture }, f4: { value: faceRTs[4].texture }, f5: { value: faceRTs[5].texture },
+              vp: { value: faceVP }, eyePos: { value: EYE_POS },
+              mode: { value: MODE }, vfov: { value: VFOV }, yaw: { value: yaw }, flip: { value: FLIP } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+  fragmentShader: `
+    precision highp float;
+    uniform sampler2D f0, f1, f2, f3, f4, f5;
+    uniform mat4 vp[6]; uniform vec3 eyePos;
+    uniform int mode; uniform float vfov, yaw, flip;
+    varying vec2 vUv;
+    const float PI = 3.141592653589793;
+    vec2 faceUV(mat4 m, vec3 d) { vec4 c = m * vec4(eyePos + d, 1.0); return clamp(c.xy / c.w * 0.5 + 0.5, 0.0005, 0.9995); }
+    void main() {
+      float lon = (vUv.x - 0.5) * 2.0 * PI * flip + yaw;
+      vec3 d;
+      if (mode == 0) { float lat = (vUv.y - 0.5) * PI;
+        d = vec3(sin(lon) * cos(lat), sin(lat), -cos(lon) * cos(lat)); }
+      else { float y = (vUv.y - 0.5) * 2.0 * tan(vfov * 0.5);
+        d = normalize(vec3(sin(lon), y, -cos(lon))); }
+      vec3 a = abs(d); vec4 col;
+      if (a.x >= a.y && a.x >= a.z) col = d.x > 0.0 ? texture2D(f0, faceUV(vp[0], d)) : texture2D(f1, faceUV(vp[1], d));
+      else if (a.y >= a.z)          col = d.y > 0.0 ? texture2D(f2, faceUV(vp[2], d)) : texture2D(f3, faceUV(vp[3], d));
+      else                          col = d.z > 0.0 ? texture2D(f4, faceUV(vp[4], d)) : texture2D(f5, faceUV(vp[5], d));
+      gl_FragColor = col;
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
+    }`,
+  depthTest: false, depthWrite: false, toneMapped: true,
+});
+quadScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), projMat));
+
+// ---------- loop ----------
+const hud = document.getElementById('hud');
+hud.style.display = SHOW_HUD ? 'block' : 'none';
+function resize() { renderer.setSize(innerWidth, innerHeight, false);
+  renderer.domElement.style.width = innerWidth + 'px'; renderer.domElement.style.height = innerHeight + 'px'; }
+addEventListener('resize', resize); resize();
+
+// persp=1: ordinary close-up camera on Glenda (for checking the character, not for the room)
+const PERSP = P.get('persp') === '1' ? new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.05, 50) : null;
+if (PERSP) { PERSP.position.set(0.35, 1.25, -0.6); PERSP.lookAt(0, 0.75, -2.2); }
+const clock = new THREE.Clock();
+let frames = 0, fps = 0, fpsT = performance.now();
+function tick(now) {
+  const dt = clock.getDelta();
+  yaw += THREE.MathUtils.degToRad(SPIN) * dt;
+  projMat.uniforms.yaw.value = yaw;
+  if (mixer) mixer.update(dt);
+  // laboured breathing: RR 22 → ~2.7 s per breath
+  const br = Math.sin(now / 1000 * Math.PI * 2 * (22 / 60));
+  if (glenda.userData.torso) glenda.userData.torso.scale.set(1 + br * 0.02, 1, 1 + br * 0.03);
+  // faces render linear (no tone mapping into render targets); the projection pass applies it once
+  if (PERSP) { renderer.setRenderTarget(null); renderer.render(scene, PERSP); }
+  else { renderFaces(); renderer.render(quadScene, quadCam); }
+  frames++; if (now - fpsT > 1000) { fps = frames; frames = 0; fpsT = now; }
+  if (SHOW_HUD) hud.textContent = `${MODE ? 'cylinder' : 'equirect'} | ${innerWidth}x${innerHeight} | cube ${CUBE} | ${fps} fps`;
+  if (P.get('still') !== '1') requestAnimationFrame(tick);
+}
+// still=1: render a single frame once everything has loaded (for testing / thumbnails)
+if (P.get('still') === '1') {
+  let pending = 2;
+  const go = () => { if (--pending) return; setTimeout(() => { tick(performance.now()); tick(performance.now() + 16); window.__done = true; }, 500); };
+  THREE.DefaultLoadingManager.onLoad = go;
+  (function waitGlenda(){ glendaReady ? go() : setTimeout(waitGlenda, 200); })();
+} else requestAnimationFrame(tick);
+</script>
+</body>
+</html>
