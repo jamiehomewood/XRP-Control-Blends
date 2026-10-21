@@ -66,7 +66,7 @@ def quad(name, pts, m, uv=((0, 0), (1, 0), (1, 1), (0, 1))):
 ay0, ay1 = Y1, Y1 + GLENDA_D
 sofa = snap(gltf("sofa_03", (0.0, ay0 + 0.45), rot_z=0.0, scale=0.8), 1, +1, ay1 - 0.03)
 smn, smx = bounds(sofa)
-# her two pairs of orange throw cushions on the seat, one pair at each end, in front of the sofa's own cushions.
+# her orange throw cushions on the seat, one at each end, in front of the sofa's own cushions.
 # Each cushion is settled on its own: rays down over its footprint (cushions hidden) find the highest point under it,
 # so neither cushion of a pair sinks into the seat or the sofa arm.
 def settle(root):
@@ -86,6 +86,11 @@ def settle(root):
     for o in meshes: o.hide_viewport = False
     for o, (top, bottom) in hits.items():
         if top is not None: o.matrix_world = Matrix.Translation((0, 0, top - 0.015 - bottom)) @ o.matrix_world
+    bpy.context.view_layer.update()
+    # the model is a pair; the back one ends up perched on the sofa's own cushions, so keep only the one on the seat
+    low = min(hits, key=lambda o: min((o.matrix_world @ Vector(c)).z for c in o.bound_box))
+    for o in meshes:
+        if o is not low: bpy.data.objects.remove(o, do_unlink=True)
     bpy.context.view_layer.update()
 for px_, rz_ in ((smn.x + 0.5, 0.2), (smx.x - 0.5, -0.15)):
     settle(gltf("throw_pillows_01", (px_, smx.y - 0.56), rot_z=rz_, scale=0.6, z=0.45))

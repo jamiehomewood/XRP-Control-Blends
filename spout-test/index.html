@@ -71,6 +71,7 @@ renderer.toneMappingExposure = parseFloat(P.get('exposure') || '1.0');
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();                   // holds only Glenda + invisible occluders
+if (window.__probe) window.__scene = scene;          // test hook
 const loader = new GLTFLoader();
 
 // ---------- the room panorama ----------
