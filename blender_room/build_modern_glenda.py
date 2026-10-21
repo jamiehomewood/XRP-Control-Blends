@@ -102,7 +102,7 @@ box("GL_rug_edge", (2.63, 1.98, 0.003), (0.125, 1.65, 0.0015), flat("GL_rug_edge
 sw_y = Y0 - SOFA_D
 stand = snap(gltf("ClassicNightstand_01", (-1.55, sw_y + 0.3), rot_z=math.pi, fit_w=0.75), 1, -1, sw_y + 0.03)
 nmn, nmx = bounds(stand)
-gltf("television_02", ((nmn.x + nmx.x) / 2, (nmn.y + nmx.y) / 2 + 0.02), rot_z=math.pi + 0.35, scale=1.25, z=top_of(stand))
+gltf("television_02", ((nmn.x + nmx.x) / 2, (nmn.y + nmx.y) / 2 + 0.02), rot_z=math.pi - 0.25, scale=1.25, z=top_of(stand))   # turned to face the sofa
 wing = snap(gltf("ArmChair_01", (-2.55, sw_y + 0.5), rot_z=math.pi - 0.45), 1, -1, sw_y + 0.03)
 
 # ======================================================================== west recess: the tall dresser with her ornaments
