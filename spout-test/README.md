@@ -87,7 +87,7 @@ Save the file and refresh the OBS source; no restart needed.
 | `hud=1` | Status display |
 | `exposure=1.2` | Brightens Glenda only (the room is fixed in the render) |
 | `cube=768` | Lowers Glenda's render resolution if the frame rate is low (default 1024) |
-| `eye=1.0`, `eye=1.3` | Tries a different viewer height (uses `assets/room_pano_eye100.jpg` etc.) if the room looks too high or low in the Igloo |
+| `eye=1.0` … `eye=1.75` | Viewer height in metres: 1.0, 1.12 (default), 1.3, 1.45, 1.6, 1.75. Pick the one where the virtual skirting lands on the real wall–floor line. Uses `assets/room_pano_eye145.jpg` etc. |
 | `yaw=90`, `flip=1` | Rotates or mirrors the whole output to suit the room |
 | `mode=cylinder&vfov=70` | Cylindrical strip output |
 | `say=hello&delay=3` | Plays a dialogue node automatically after loading |
