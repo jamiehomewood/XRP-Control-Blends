@@ -282,9 +282,10 @@ kit = put("kitchen_pariz", (KX - 0.3, 0.725), rot_z=math.radians(-90), back=(0, 
 for o in list(tree(kit)):                         # no fresh fruit or new-looking bowls in this kitchen
     if o.type == "MESH" and any(s.material and s.material.name.split(".")[0] in ("apple", "wooden bowl") for s in o.material_slots):
         bpy.data.objects.remove(o, do_unlink=True)
-for o in list(tree(kit)):                         # one of the model's drawers has stray geometry reaching back across the room
-    if o.name in bpy.data.objects and o.type == "MESH" and bounds([o])[0].x < X1 + 0.1:
-        for c in [*o.children_recursive, o]: bpy.data.objects.remove(c, do_unlink=True)   # with its handle
+stray = set()                                     # one of the model's drawers has stray geometry reaching back across the room
+for o in tree(kit):
+    if o.type == "MESH" and bounds([o])[0].x < X1 + 0.1: stray |= {o, *o.children_recursive}   # with its handle
+for o in stray: bpy.data.objects.remove(o, do_unlink=True)
 recolour(kit, "wood_drawers dark", (0.30, 0.16, 0.07), "oak80s")    # dark grey doors -> tired brown 'oak effect'
 recolour(kit, "wood_drawers light", (0.30, 0.16, 0.07), "oak80s")
 recolour(kit, "wood_cabinets", (0.30, 0.16, 0.07), "oak80s")
