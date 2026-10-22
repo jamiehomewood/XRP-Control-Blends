@@ -146,6 +146,7 @@ LIBRARY = {}
 _old = bpy.data.collections.get("BK_library")
 if _old:                                          # drop the copies a previous build loaded (placed pieces keep their mesh data)
     for o in list(_old.objects): bpy.data.objects.remove(o, do_unlink=True)
+bpy.data.orphans_purge(do_local_ids=True, do_linked_ids=True, do_recursive=True)   # rebuilds otherwise pile up copies until the GPU runs out of memory
 with bpy.data.libraries.load(LIB, link=False) as (src, dst):
     dst.objects = list(src.objects)
 for o in dst.objects:
