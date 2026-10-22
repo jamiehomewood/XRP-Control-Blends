@@ -75,6 +75,35 @@ if coll.name not in sc.collection.children: sc.collection.children.link(coll)
 
 M = bpy.data.materials
 wallpaper, floor_m, lino, ceiling_m = M["Wallpaper"], M["Floor_wood"], M["Lino"], M["Ceiling_paint"]
+
+# the empty dated room (its own scene, not when another script borrows this shell): dirty cream emulsion above the
+# dado rail, the old striped wallpaper kept below it. A copy of the wallpaper, so the main room is untouched.
+PAINT_ABOVE_DADO = globals().get("PAINT_ABOVE_DADO", not MODERN and SCENE_NAME == "RecessTest")
+if PAINT_ABOVE_DADO:
+    _nm = "Wallpaper_paintabove_recess"
+    if M.get(_nm): M.get(_nm).name = _nm + "_old"            # rebuilt every run
+    wallpaper = M["Wallpaper"].copy(); wallpaper.name = _nm; _nt = wallpaper.node_tree
+    _b = next(n for n in _nt.nodes if n.type == "BSDF_PRINCIPLED"); _bi = _b.inputs["Base Color"]
+    _paper = _bi.links[0].from_socket if _bi.links else None
+    _geo = _nt.nodes.new("ShaderNodeNewGeometry"); _sep = _nt.nodes.new("ShaderNodeSeparateXYZ"); _nt.links.new(_geo.outputs["Position"], _sep.inputs[0])
+    _gt = _nt.nodes.new("ShaderNodeMath"); _gt.operation = "GREATER_THAN"; _gt.inputs[1].default_value = 0.92; _nt.links.new(_sep.outputs["Z"], _gt.inputs[0])
+    _nz = _nt.nodes.new("ShaderNodeTexNoise"); _nz.inputs["Scale"].default_value = 3.0; _nz.inputs["Detail"].default_value = 6; _nt.links.new(_geo.outputs["Position"], _nz.inputs["Vector"])
+    _rp = _nt.nodes.new("ShaderNodeValToRGB"); _nt.links.new(_nz.outputs["Fac"], _rp.inputs[0])
+    _rp.color_ramp.elements[0].position = 0.35; _rp.color_ramp.elements[0].color = (0.80, 0.74, 0.58, 1)
+    _rp.color_ramp.elements[1].position = 0.75; _rp.color_ramp.elements[1].color = (0.66, 0.58, 0.38, 1)
+    # nicotine/damp darkening creeping down from the ceiling
+    _mr = _nt.nodes.new("ShaderNodeMapRange"); _nt.links.new(_sep.outputs["Z"], _mr.inputs[0]); _mr.inputs[1].default_value, _mr.inputs[2].default_value = 1.4, 2.25
+    _n2 = _nt.nodes.new("ShaderNodeTexNoise"); _n2.inputs["Scale"].default_value = 1.4; _n2.inputs["Detail"].default_value = 8; _nt.links.new(_geo.outputs["Position"], _n2.inputs["Vector"])
+    _m2 = _nt.nodes.new("ShaderNodeMath"); _m2.operation = "MULTIPLY"; _m2.use_clamp = True; _nt.links.new(_mr.outputs[0], _m2.inputs[0]); _nt.links.new(_n2.outputs["Fac"], _m2.inputs[1])
+    _st = _nt.nodes.new("ShaderNodeMix"); _st.data_type = "RGBA"; _st.blend_type = "MULTIPLY"; _st.inputs[7].default_value = (0.55, 0.45, 0.28, 1)
+    _nt.links.new(_m2.outputs[0], _st.inputs["Factor"]); _nt.links.new(_rp.outputs[0], _st.inputs[6])
+    _mx = _nt.nodes.new("ShaderNodeMix"); _mx.data_type = "RGBA"; _mx.inputs[6].default_value = (*_bi.default_value[:3], 1)
+    if _paper: _nt.links.new(_paper, _mx.inputs[6])
+    _nt.links.new(_st.outputs[2], _mx.inputs[7]); _nt.links.new(_gt.outputs[0], _mx.inputs["Factor"]); _nt.links.new(_mx.outputs[2], _bi)
+    if _b.inputs["Normal"].links:                                # no wallpaper emboss on the paint
+        _ns = _b.inputs["Normal"].links[0].from_socket
+        _nm2 = _nt.nodes.new("ShaderNodeMix"); _nm2.data_type = "VECTOR"; _nt.links.new(_gt.outputs[0], _nm2.inputs["Factor"])
+        _nt.links.new(_ns, _nm2.inputs[4]); _nt.links.new(_geo.outputs["Normal"], _nm2.inputs[5]); _nt.links.new(_nm2.outputs[1], _b.inputs["Normal"])
 gloss, reveal, shell_m = M["Gloss_white"], M["Reveal"], M["Shell_black"]
 hall_floor = M["Floor_wood"]
 
