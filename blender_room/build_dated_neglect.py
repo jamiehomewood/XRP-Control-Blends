@@ -89,7 +89,7 @@ M = bpy.data.materials
 walls = grimed(M["Wallpaper"], "neglect", stain=(0.30, 0.25, 0.12), scale=1.3, amount=0.75, band=(1.25, 2.2, False), tint=(0.86, 0.82, 0.70), seed=1.0)
 walls_low = grimed(M["Wallpaper"], "scuff", stain=(0.35, 0.30, 0.22), scale=2.5, amount=0.6, band=(0.0, 0.45, True), tint=(0.86, 0.82, 0.70), seed=2.0)
 ceil = grimed(M["Ceiling_paint"], "nicotine", stain=(0.42, 0.30, 0.13), scale=0.9, amount=0.8, tint=(0.88, 0.80, 0.62), seed=3.0)
-carpet = grimed(M["Carpet_plain"], "stained", stain=(0.25, 0.19, 0.13), scale=1.8, amount=0.85, tint=(0.82, 0.78, 0.72), seed=4.0)
+carpet = grimed(M["Carpet_plain"], "stained", stain=(0.30, 0.23, 0.15), scale=1.8, amount=0.6, tint=(0.82, 0.78, 0.72), seed=4.0)
 kitch = grimed(M["dated_kitchen_paint"], "grease", stain=(0.32, 0.26, 0.12), scale=2.0, amount=0.8, band=(1.2, 2.2, False), tint=(0.85, 0.80, 0.68), seed=5.0)
 lino = grimed(M["Lino"], "grime", stain=(0.30, 0.25, 0.18), scale=2.2, amount=0.8, tint=(0.85, 0.82, 0.75), seed=6.0)
 hall = grimed(M["dated_hall_paint"], "grime", stain=(0.32, 0.26, 0.14), scale=1.5, amount=0.6, band=(1.3, 2.2, False), tint=(0.86, 0.82, 0.72), seed=7.0)
@@ -147,7 +147,8 @@ def copy_tree(root):
 
 def put(key, xy, rot_z=0.0, z=0.0, scale=1.0, fit=None, back=None):
     """Place a library piece: centred on xy (or with its back face at `back` = (axis, value)), standing on z,
-    turned by rot_z (its front faces -Y before turning), uniformly scaled (or fit=(axis, size) in metres)."""
+    turned by rot_z (its front faces -Y before turning), uniformly scaled (or fit=(axis, size) in metres,
+    measured along the model's own axes before it is turned)."""
     root = copy_tree(LIBRARY[key])
     root.matrix_world = Matrix.Identity(4); root.location = (0, 0, 0); root.rotation_euler = (0, 0, 0); root.scale = (1, 1, 1)
     parts = [root, *root.children_recursive]
@@ -182,11 +183,11 @@ put("letters", (smx.x - 0.35, (smn.y + smx.y) / 2 - 0.08), rot_z=-0.3, z=seat_z 
 
 # bookcase recess, north wall west of the alcove
 BR = g["BOOK_RECESS"]
-put("bookcase", ((BR[0] + BR[1]) / 2, Y1 + BR[2] - 0.2), rot_z=math.radians(90), fit=(0, (BR[1] - BR[0]) - 0.08), back=(1, Y1 + BR[2] - 0.02, +1))
+put("bookcase", ((BR[0] + BR[1]) / 2, Y1 + BR[2] - 0.2), rot_z=math.radians(90), fit=(1, (BR[1] - BR[0]) - 0.08), back=(1, Y1 + BR[2] - 0.02, +1))   # the model is long along its own Y
 
 # west recess: the big dark dresser, its counter covered in clutter
 DY0, DY1 = g["DRESSER_Y"]; DD = g["DRESSER_D"]
-dres = put("dresser", (X0 - DD / 2, (DY0 + DY1) / 2), rot_z=math.radians(-90), fit=(1, (DY1 - DY0) - 0.06), back=(0, X0 - DD + 0.02, -1))
+dres = put("dresser", (X0 - DD / 2, (DY0 + DY1) / 2), rot_z=math.radians(-90), fit=(0, (DY1 - DY0) - 0.06), back=(0, X0 - DD + 0.02, -1))   # fit uses the model's own (unturned) axes
 dmn, dmx = bounds([dres, *dres.children_recursive])
 ctr_z = dmn.z + (dmx.z - dmn.z) * 0.44          # the counter between the cupboards and the glass top
 put("radio", (dmx.x - 0.2, DY0 + 0.35), rot_z=math.radians(-90), z=ctr_z, fit=(0, 0.3))
