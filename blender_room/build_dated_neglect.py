@@ -183,7 +183,7 @@ put("letters", (smx.x - 0.35, (smn.y + smx.y) / 2 - 0.08), rot_z=-0.3, z=seat_z 
 
 # bookcase recess, north wall west of the alcove
 BR = g["BOOK_RECESS"]
-put("bookcase", ((BR[0] + BR[1]) / 2, Y1 + BR[2] - 0.2), rot_z=math.radians(90), fit=(1, (BR[1] - BR[0]) - 0.08), back=(1, Y1 + BR[2] - 0.02, +1))   # the model is long along its own Y
+put("bookcase", ((BR[0] + BR[1]) / 2, Y1 + BR[2] - 0.2), rot_z=math.radians(-90), fit=(1, (BR[1] - BR[0]) - 0.08), back=(1, Y1 + BR[2] - 0.02, +1))   # the model is long along its own Y
 
 # west recess: the big dark dresser, its counter covered in clutter (turned +90deg so its front faces into the room, +X)
 DY0, DY1 = g["DRESSER_Y"]; DD = g["DRESSER_D"]
@@ -199,7 +199,9 @@ put("bottle_dark", (dmx.x - 0.28, DY1 - 0.22), z=ctr_z)
 SB = Y0 - g["SOFA_D"]
 put("armchair_floral", (X0 + 0.75, SB + 0.42), rot_z=math.radians(170), fit=(1, g["SOFA_D"] - 0.04), back=(1, SB + 0.02, -1))
 put("tv_legs", (g["SOFA_X1"] - 0.55, SB + 0.35), rot_z=math.radians(200), back=(1, SB + 0.02, -1))
-put("standard_lamp", (X0 + 0.2, SB + 0.2))
+lamp = put("standard_lamp", (X0 + 0.2, SB + 0.2))
+for o in list(lamp.children_recursive):          # its flex is a long curve that trails across the whole floor
+    if "wire" in o.name.lower(): bpy.data.objects.remove(o, do_unlink=True)
 
 # kitchen beyond the arch (pieces turned -90deg to face back into the room, -X): the old cooker, a cabinet used as a counter, piled with dirty dishes and rubbish
 KX = X1 + g["KITCHEN_D"]; KY0, KY1 = g["KITCHEN_Y"]
