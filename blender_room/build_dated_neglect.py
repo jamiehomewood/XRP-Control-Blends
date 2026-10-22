@@ -323,7 +323,7 @@ if smn_.y - KY0 >= bw + 0.02:
 else:
     binr.location += Vector((X1 + g["ARCH_T"] + 0.02 + bw / 2 - (bmn.x + bmx.x) / 2, KY0 + 0.01 + bw / 2 - (bmn.y + bmx.y) / 2, 0))
 bpy.context.view_layer.update()
-put("binbag_a", (X1 + 0.45, KY0 + 0.72), rot_z=0.7)          # by the bin
+put("binbag_b", (X1 + 0.5, KY0 + 0.75), rot_z=2.2)          # by the bin (binbag_a has a long tie that pokes into the room here)
 put("binbag_b", (X1 + 0.6, KY1 - 0.35), rot_z=-0.4)
 put("box_open", (KX - 1.0, KY1 - 0.3), rot_z=0.2)
 
