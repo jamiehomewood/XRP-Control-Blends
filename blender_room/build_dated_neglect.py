@@ -223,8 +223,10 @@ def recolour(root, name, rgb, tag, match=None):
             if not (match(s.material) if match else s.material.name.split(".")[0] == name.split(".")[0] and s.material.name.startswith(name)): continue
             nm = f"{name}_{tag}"
             m = bpy.data.materials.get(nm)
+            if m and m.get("rgb") != list(rgb) and s.material != m:      # left over from an earlier build with another colour
+                m.name = nm + "_old"; m = None
             if not m:
-                m = s.material.copy(); m.name = nm; nt = m.node_tree
+                m = s.material.copy(); m.name = nm; m["rgb"] = list(rgb); nt = m.node_tree
                 bsdf = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED"); bi = bsdf.inputs["Base Color"]
                 img = next((n for n in nt.nodes if n.type == "TEX_IMAGE" and "base" in n.image.name.lower()), None) if bi.links else None
                 if img or bi.links:
@@ -239,9 +241,9 @@ kit = put("kitchen_pariz", (KX - 0.3, 0.725), rot_z=math.radians(-90), back=(0, 
 for o in list(tree(kit)):                         # no fresh fruit or new-looking bowls in this kitchen
     if o.type == "MESH" and any(s.material and s.material.name.split(".")[0] in ("apple", "wooden bowl") for s in o.material_slots):
         bpy.data.objects.remove(o, do_unlink=True)
-recolour(kit, "wood_drawers dark", (0.34, 0.19, 0.09), "oak80s")    # dark grey doors -> tired brown 'oak effect'
-recolour(kit, "wood_drawers light", (0.40, 0.24, 0.12), "oak80s")
-recolour(kit, "wood_cabinets", (0.36, 0.21, 0.10), "oak80s")
+recolour(kit, "wood_drawers dark", (0.30, 0.16, 0.07), "oak80s")    # dark grey doors -> tired brown 'oak effect'
+recolour(kit, "wood_drawers light", (0.30, 0.16, 0.07), "oak80s")
+recolour(kit, "wood_cabinets", (0.30, 0.16, 0.07), "oak80s")
 recolour(kit, "wood_tabletop", (0.62, 0.55, 0.42), "stained")
 kmn, kmx = bounds(tree(kit))
 work_z = max(bounds([o])[1].z for o in tree(kit) if o.type == "MESH" and any(s.material and "tabletop" in s.material.name for s in o.material_slots))   # top of the worktop
