@@ -221,7 +221,6 @@ st = put("side_table", (GX1 - 0.32, AB - 0.32), back=(1, AB - 0.02, +1))
 tz = top_of(st)
 plate_with_cutlery((GX1 - 0.34, AB - 0.40), tz, rot=0.3)
 place("coffee_cup", (GX1 - 0.18, AB - 0.22), tz)
-place("beer_can", (GX1 - 0.50, AB - 0.20), tz)
 smn, smx = bounds([sofa, *sofa.children_recursive])
 seat_z = smn.z + (smx.z - smn.z) * 0.48
 put("magazines", (smn.x + 0.35, (smn.y + smx.y) / 2 - 0.05), rot_z=0.4, z=seat_z)
@@ -236,11 +235,10 @@ DY0, DY1 = g["DRESSER_Y"]; DD = g["DRESSER_D"]
 dres = put("dresser", (X0 - DD / 2, (DY0 + DY1) / 2), rot_z=math.radians(90), fit=(0, (DY1 - DY0) - 0.06), back=(0, X0 - DD + 0.02, -1))   # fit uses the model's own (unturned) axes
 dmn, dmx = bounds([dres, *dres.children_recursive])
 ctr_z = dmn.z + (dmx.z - dmn.z) * 0.44          # the counter between the cupboards and the glass top
-drop(put("radio", (dmx.x - 0.2, DY0 + 0.35), rot_z=math.radians(90), z=ctr_z + 0.02, fit=(0, 0.3)))
+drop(put("radio", (dmx.x - 0.2, DY0 + 0.25), rot_z=math.radians(90), z=ctr_z + 0.02, fit=(0, 0.3)))
 drop(put("dead_plant", (dmx.x - 0.2, (DY0 + DY1) / 2 - 0.1), rot_z=math.radians(80), z=ctr_z + 0.02))
-place("beer_bottle", (dmx.x - 0.18, DY1 - 0.30), ctr_z)
-place("bottle_dark", (dmx.x - 0.28, DY1 - 0.20), ctr_z)
-plate_with_cutlery((dmx.x - 0.22, (DY0 + DY1) / 2 + 0.38), ctr_z, rot=-0.4)
+place("beer_bottle", (dmx.x - 0.18, DY1 - 0.26), ctr_z)
+place("bottle_dark", (dmx.x - 0.28, DY1 - 0.16), ctr_z)
 
 # south-west recess: her floral armchair and the old telly, a standard lamp in the corner
 SB = Y0 - g["SOFA_D"]
@@ -398,6 +396,132 @@ for zc in (0.5, 1.42):
         door_box(f"Neglect_door_panelb_{zc}_{xo}", (0.30, 0.012, 0.70 if zc > 1 else 0.62), (DX + xo, DY - 0.024, zc), gloss)
 for sy in (+1, -1):
     door_box(f"Neglect_door_knob_{sy}", (0.06, 0.05, 0.06), (DX + DW / 2 - 0.07, DY + sy * 0.045, 1.0), brass)
+
+# ---- smoking, drink, medicines and drugs: cues for the nurse to notice --------------------------------------
+def soft(name, rgb, rough=0.5, metal=0.0, trans=0.0):
+    m = bpy.data.materials.get(name) or bpy.data.materials.new(name); m.use_nodes = True
+    b = m.node_tree.nodes["Principled BSDF"]
+    b.inputs["Base Color"].default_value = (*rgb, 1); b.inputs["Roughness"].default_value = rough; b.inputs["Metallic"].default_value = metal
+    if "Transmission Weight" in b.inputs: b.inputs["Transmission Weight"].default_value = trans
+    return m
+
+def mesh_obj(name, build, mat, parent=None):
+    import bmesh
+    me = bpy.data.meshes.new(name); bm = bmesh.new(); build(bm); bm.to_mesh(me); bm.free()
+    me.materials.append(mat); o = bpy.data.objects.new(name, me); coll.objects.link(o)
+    if parent: o.parent = parent
+    return o
+
+def empty(name, xy, z=0.0, rot=0.0):
+    e = bpy.data.objects.new(name, None); coll.objects.link(e); e.empty_display_size = 0.05
+    e.matrix_world = Matrix.Translation((xy[0], xy[1], z)) @ Matrix.Rotation(rot, 4, "Z"); return e
+
+def cyl(bm, r1, r2, depth, x0, segs=16, zc=0.0045):
+    """a cone/cylinder lying along +X starting at x0, its axis at height zc (the barrel's radius: lying on the surface)"""
+    import bmesh
+    g = bmesh.ops.create_cone(bm, cap_ends=True, segments=segs, radius1=r1, radius2=r2, depth=depth)
+    bmesh.ops.transform(bm, matrix=Matrix.Translation((x0 + depth / 2, 0, zc)) @ Matrix.Rotation(math.pi / 2, 4, "Y"), verts=g["verts"])
+
+def butt(xy, z, rot, tilt=0.0):
+    """a stubbed-out cigarette end: the cigarette shortened along its length"""
+    c = put("cigarette", xy, rot_z=rot, z=z)
+    c.matrix_world = c.matrix_world @ Matrix.Diagonal((1.0, 0.35, 1.0, 1.0)) @ Matrix.Rotation(tilt, 4, "Y")
+    return c
+
+ASH = soft("Neglect_ash", (0.22, 0.21, 0.20), 0.95)
+def full_ashtray(xy, z, key="ashtray", n=9):
+    a = place(key, xy, z)
+    amn, amx = bounds(tree(a)); r_in = (amx.x - amn.x) * 0.28
+    mesh_obj("Neglect_ash_heap", lambda bm: __import__("bmesh").ops.create_uvsphere(bm, u_segments=12, v_segments=6, radius=r_in), ASH).matrix_world = \
+        Matrix.Translation((xy[0], xy[1], amn.z + 0.004)) @ Matrix.Diagonal((1, 1, 0.22, 1))
+    for i in range(n):
+        ang = random.uniform(0, 2 * math.pi); rr = random.uniform(0.2, 1.0) * r_in
+        butt((xy[0] + rr * math.cos(ang), xy[1] + rr * math.sin(ang)), amn.z + 0.008 + 0.004 * (i % 3), random.uniform(0, 6.3), random.uniform(-0.4, 0.4))
+    return a
+
+PLASTIC = soft("Neglect_syringe_barrel", (0.92, 0.94, 0.95), 0.15, trans=0.85)
+RUBBER = soft("Neglect_rubber", (0.03, 0.03, 0.03), 0.6)
+CAP = soft("Neglect_orange_cap", (0.95, 0.35, 0.04), 0.4)
+STEEL = soft("Neglect_steel", (0.75, 0.75, 0.78), 0.2, metal=1.0)
+def syringe(xy, z, rot, capped=False):
+    """a used 1ml syringe lying on its side (procedural)"""
+    e = empty("Neglect_syringe", xy, z, rot)
+    mesh_obj("Neglect_syringe_barrel", lambda bm: cyl(bm, 0.0045, 0.0045, 0.055, 0.0), PLASTIC, e)
+    mesh_obj("Neglect_syringe_plunger", lambda bm: (cyl(bm, 0.0018, 0.0018, 0.05, -0.035), cyl(bm, 0.0044, 0.0044, 0.002, -0.037)), RUBBER, e)
+    mesh_obj("Neglect_syringe_tip", lambda bm: cyl(bm, 0.0045, 0.0015, 0.006, 0.055), PLASTIC, e)
+    if capped: mesh_obj("Neglect_syringe_cap", lambda bm: cyl(bm, 0.0028, 0.0022, 0.018, 0.061), CAP, e)
+    else: mesh_obj("Neglect_syringe_needle", lambda bm: cyl(bm, 0.0004, 0.0003, 0.013, 0.061, segs=6), STEEL, e)
+    for c in e.children: c.matrix_parent_inverse = Matrix.Identity(4)
+    bpy.context.view_layer.update(); return drop(e)
+
+FOIL = bpy.data.materials.get("Neglect_burnt_foil")
+if not FOIL:
+    FOIL = soft("Neglect_burnt_foil", (0.82, 0.82, 0.84), 0.25, metal=1.0); nt = FOIL.node_tree; b = nt.nodes["Principled BSDF"]
+    tc = nt.nodes.new("ShaderNodeTexCoord"); sep = nt.nodes.new("ShaderNodeSeparateXYZ"); nt.links.new(tc.outputs["Object"], sep.inputs[0])
+    ab = nt.nodes.new("ShaderNodeMath"); ab.operation = "ABSOLUTE"; nt.links.new(sep.outputs["Y"], ab.inputs[0])
+    mr = nt.nodes.new("ShaderNodeMapRange"); nt.links.new(ab.outputs[0], mr.inputs[0])
+    mr.inputs[1].default_value, mr.inputs[2].default_value, mr.inputs[3].default_value, mr.inputs[4].default_value = 0.004, 0.02, 1.0, 0.0
+    nz = nt.nodes.new("ShaderNodeTexNoise"); nz.inputs["Scale"].default_value = 90; nt.links.new(tc.outputs["Object"], nz.inputs["Vector"])
+    mu = nt.nodes.new("ShaderNodeMath"); mu.operation = "MULTIPLY"; mu.use_clamp = True; mu.inputs[1].default_value = 1.6
+    m2 = nt.nodes.new("ShaderNodeMath"); m2.operation = "MULTIPLY"; nt.links.new(mr.outputs[0], m2.inputs[0]); nt.links.new(nz.outputs["Fac"], m2.inputs[1])
+    nt.links.new(m2.outputs[0], mu.inputs[0])
+    mix = nt.nodes.new("ShaderNodeMix"); mix.data_type = "RGBA"; mix.inputs[6].default_value = (0.82, 0.82, 0.84, 1); mix.inputs[7].default_value = (0.05, 0.035, 0.02, 1)
+    nt.links.new(mu.outputs[0], mix.inputs["Factor"]); nt.links.new(mix.outputs[2], b.inputs["Base Color"])
+    rmix = nt.nodes.new("ShaderNodeMapRange"); nt.links.new(mu.outputs[0], rmix.inputs[0]); rmix.inputs[3].default_value, rmix.inputs[4].default_value = 0.25, 0.8
+    nt.links.new(rmix.outputs[0], b.inputs["Roughness"])
+def foil(xy, z, rot):
+    """a crumpled square of kitchen foil with a burnt streak down the middle (procedural)"""
+    import bmesh
+    def build(bm):
+        bmesh.ops.create_grid(bm, x_segments=18, y_segments=18, size=0.06)
+        for v in bm.verts:
+            v.co.x *= 1.0 + random.uniform(-0.03, 0.03); v.co.z = 0.002 + 0.0025 * random.random() + 0.012 * (abs(v.co.x) / 0.06) ** 2
+    o = mesh_obj("Neglect_foil", build, FOIL); o.matrix_world = Matrix.Translation((xy[0], xy[1], z + 0.01)) @ Matrix.Rotation(rot, 4, "Z")
+    bpy.context.view_layer.update(); return drop(o)
+
+SOOT = soft("Neglect_sooty_spoon", (0.07, 0.055, 0.04), 0.55, metal=0.7)
+def burnt_spoon(xy, z, rot):
+    src = next(c for c in LIBRARY["tray_dirty"].children if c.name.split(".")[0] == "Spoon")
+    c = copy_tree(src); c.parent = None; c.matrix_world = src.matrix_world.copy()
+    cmn, cmx = bounds(tree(c)); ctr = (cmn + cmx) / 2
+    c.matrix_world = Matrix.Translation((xy[0], xy[1], z + 0.02)) @ Matrix.Rotation(rot, 4, "Z") @ Matrix.Translation((-ctr.x, -ctr.y, -cmn.z)) @ c.matrix_world
+    for sl in c.material_slots: sl.link = "OBJECT"; sl.material = SOOT
+    bpy.context.view_layer.update(); return drop(c)
+
+random.seed(21)
+# side table by her sofa: the green ashtray with a cigarette left burning down, a lighter, and her tablets
+place("ashtray_cig", (GX1 - 0.50, AB - 0.20), tz)
+place("lighter", (GX1 - 0.16, AB - 0.45), tz, rot_z=0.8)
+place("pill_bottle", (GX1 - 0.10, AB - 0.30), tz)
+# alcove floor by the side table: an empty can, an empty whisky bottle, a used syringe (a sharps risk for the nurse)
+place("beer_can", (GX1 - 0.10, AB - 0.72), 0.0)
+place("whisky", (GX1 - 0.25, AB - 0.80), 0.0, rot_z=0.4)
+syringe((GX1 - 0.55, AB - 0.62), 0.0, rot=2.4)
+for i in range(4):
+    butt((GX1 - random.uniform(0.2, 0.7), AB - random.uniform(0.55, 0.85)), 0.003, random.uniform(0, 6.3), math.pi / 2)
+
+# dresser counter: an overflowing ashtray, and the foil, blackened spoon, lighter and syringes someone uses
+full_ashtray((dmx.x - 0.2, DY0 + 0.55), ctr_z, n=10)
+dz = ctr_z
+foil((dmx.x - 0.22, DY0 + 1.02), dz, 0.3)
+burnt_spoon((dmx.x - 0.14, DY0 + 1.12), dz, 1.9)
+place("lighter", (dmx.x - 0.30, DY0 + 1.14), dz, rot_z=-0.5)
+syringe((dmx.x - 0.12, DY0 + 0.93), dz, rot=1.2)
+syringe((dmx.x - 0.32, DY0 + 0.96), dz, rot=-0.3, capped=True)
+
+# kitchen worktop: tablets left out (bottle, blister sheets) and the cigarettes; cans by the bin
+place("pill_sheets", (KX - 0.45, kmn.y + 1.10), work_z, rot_z=0.4, fit=(0, 0.16))
+place("pill_bottle", (KX - 0.46, kmn.y + 0.62), work_z)
+place("cig_pack", (KX - 0.42, kmn.y + 1.45), work_z, rot_z=-1.2, fit=(2, 0.10))
+full_ashtray((KX - 0.45, sy1 + 0.85), work_z, n=7) if sy1 + 0.85 < kmx.y - 0.08 else None
+for i in range(3):
+    place("beer_can", (X1 + 0.25 + 0.09 * i, KY0 + 0.55 + random.uniform(-0.04, 0.04)), 0.0, rot_z=random.uniform(0, 6))
+place("whisky", (KX - 0.85, KY1 - 0.65), 0.0, rot_z=1.0)
+
+# by the armchair: another empty bottle and butts ground into the carpet
+place("whisky", (X0 + 1.55, SB + 0.12), 0.0)
+for i in range(5):
+    butt((X0 + random.uniform(1.1, 1.6), SB + random.uniform(0.1, 0.6)), 0.003, random.uniform(0, 6.3), math.pi / 2)
 
 # hall beyond the door: rubbish bags and boxes waiting to go out (they never did)
 HY = Y0 - g["WALL_T"] - g["HALL_W"]           # far wall of the hall
