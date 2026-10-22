@@ -146,6 +146,9 @@ def copy_tree(root):
         c = o.copy(); mapping[o] = c; coll.objects.link(c)
     for o, c in mapping.items():
         if o.parent in mapping: c.parent = mapping[o.parent]; c.matrix_parent_inverse = o.matrix_parent_inverse.copy()
+    for c in mapping.values():                    # mirror modifiers must mirror about the copied frame, not the library original
+        for m in getattr(c, "modifiers", []):
+            if getattr(m, "mirror_object", None) in mapping: m.mirror_object = mapping[m.mirror_object]
     return mapping[root]
 
 def put(key, xy, rot_z=0.0, z=0.0, scale=1.0, fit=None, back=None):
@@ -282,10 +285,12 @@ kit = put("kitchen_pariz", (KX - 0.3, 0.725), rot_z=math.radians(-90), back=(0, 
 for o in list(tree(kit)):                         # no fresh fruit or new-looking bowls in this kitchen
     if o.type == "MESH" and any(s.material and s.material.name.split(".")[0] in ("apple", "wooden bowl") for s in o.material_slots):
         bpy.data.objects.remove(o, do_unlink=True)
-stray = set()                                     # one of the model's drawers has stray geometry reaching back across the room
-for o in tree(kit):
-    if o.type == "MESH" and bounds([o])[0].x < X1 + 0.1: stray |= {o, *o.children_recursive}   # with its handle
-for o in stray: bpy.data.objects.remove(o, do_unlink=True)
+# one drawer handle has come loose at one end and hangs skew
+hd = [o for o in tree(kit) if o.type == "MESH" and o.name.startswith("handle") and len(o.data.vertices) > 0]
+if hd:
+    h = min(hd, key=lambda o: bounds([o])[0].z)
+    hmn, hmx = bounds([h]); pivot = Vector((hmx.x, hmx.y, (hmn.z + hmx.z) / 2))     # the screw still holding it
+    h.matrix_world = Matrix.Translation(pivot) @ Matrix.Rotation(-0.28, 4, "X") @ Matrix.Translation(-pivot) @ h.matrix_world
 recolour(kit, "wood_drawers dark", (0.30, 0.16, 0.07), "oak80s")    # dark grey doors -> tired brown 'oak effect'
 recolour(kit, "wood_drawers light", (0.30, 0.16, 0.07), "oak80s")
 recolour(kit, "wood_cabinets", (0.30, 0.16, 0.07), "oak80s")
