@@ -226,19 +226,68 @@ on_seat("magazines", smn.x + 0.40, 0.4)
 on_seat("letters", smx.x - 0.42, -0.3)
 pl_ = plate_with_cutlery((smn.x + 0.95, SEAT_Y), smx.z, rot=0.3)
 
-# bookcase recess, north wall west of the alcove
-BR = g["BOOK_RECESS"]
-put("bookcase", ((BR[0] + BR[1]) / 2, Y1 + BR[2] - 0.2), rot_z=math.radians(-90), fit=(1, (BR[1] - BR[0]) - 0.08), back=(1, Y1 + BR[2] - 0.02, +1))   # the model is long along its own Y
+# the two shelf recesses get cheap modern flat-pack shelving, crammed and grubby, instead of antique cabinets
+def shelf_levels(x, y, ztop):
+    """heights of the surfaces under (x, y), top down: shelves found by casting a ray down again and again"""
+    bpy.context.view_layer.update(); dg = bpy.context.evaluated_depsgraph_get(); zs = []; z = ztop
+    while z > 0.05:
+        h = sc.ray_cast(dg, Vector((x, y, z)), Vector((0, 0, -1)), distance=z + 0.1)
+        if not h[0]: break
+        zs.append(h[1].z); z = h[1].z - 0.03
+    return zs
 
-# west recess: the big dark dresser, its counter covered in clutter (turned +90deg so its front faces into the room, +X)
+def grubby(root, seed):
+    """dust and grime over every material of a piece"""
+    for o in tree(root):
+        if o.type != "MESH": continue
+        for sl in o.material_slots:
+            m = sl.material
+            if not m or not m.use_nodes or m.name.endswith("_grubby") or not any(n.type == "BSDF_PRINCIPLED" for n in m.node_tree.nodes): continue
+            sl.link = "OBJECT"; sl.material = grimed(m, "grubby", stain=(0.33, 0.28, 0.20), scale=4.0, amount=0.65, tint=(0.88, 0.85, 0.78), seed=seed)
+
+# bookcase recess, north wall west of the alcove: two pine IVAR units side by side
+BR = g["BOOK_RECESS"]; BWID = (BR[1] - BR[0]) - 0.06; RYB = Y1 + BR[2] - 0.02
+ivars = []
+for k_ in (0, 1):
+    xc_ = BR[0] + 0.03 + BWID / 4 + k_ * BWID / 2
+    iv = put("ivar", (xc_, RYB - 0.15), fit=(2, min(2.0, g["RH"] - 0.12)), back=(1, RYB, +1))
+    grubby(iv, 12.0 + k_); ivars.append(iv)
+IVAR_FILL = [[("books_old", -0.12), ("magazines", 0.20)], [("basket", -0.10), ("coffee_cup", 0.22)], [("book_stack", -0.05), ("bottle_dark", 0.25)],
+             [("clothes", 0.0)], [("books", -0.15), ("beer_can", 0.15), ("pill_sheets", 0.27)], [("toy_train", -0.18), ("box_open", 0.12)],
+             [("books_old", 0.10), ("letters", -0.2)], [("basket", 0.12), ("beer_bottle", -0.2)], [("book_stack", 0.0)], [("clothes", 0.05)]]
+fi = 0
+for iv in ivars:
+    imn, imx = bounds(tree(iv)); ixc = (imn.x + imx.x) / 2; iyc = (imn.y + imx.y) / 2
+    for lz in shelf_levels(ixc, iyc - 0.02, imx.z - 0.25):
+        if lz < 0.02 or lz > 1.75: continue
+        for key, dx in IVAR_FILL[fi % len(IVAR_FILL)]:
+            w_ = 0.30 if key in ("clothes", "book_stack", "basket", "magazines", "box_open", "books_old") else None
+            kw = {"fit": (0, w_)} if w_ else {}
+            place(key, (ixc + dx * (imx.x - imn.x) / 0.79, iyc - 0.01), lz, rot_z=random.uniform(-0.25, 0.25), **kw)
+        fi += 1
+
+# west recess: a 4x4 KALLAX cube unit (front turned into the room, +X); its top two open rows are where she
+# keeps things, the bottom row is junk. KCELL(col, row) gives a cube's centre line and its floor height.
 DY0, DY1 = g["DRESSER_Y"]; DD = g["DRESSER_D"]
-dres = put("dresser", (X0 - DD / 2, (DY0 + DY1) / 2), rot_z=math.radians(90), fit=(0, (DY1 - DY0) - 0.06), back=(0, X0 - DD + 0.02, -1))   # fit uses the model's own (unturned) axes
-dmn, dmx = bounds([dres, *dres.children_recursive])
-ctr_z = dmn.z + (dmx.z - dmn.z) * 0.44          # the counter between the cupboards and the glass top
-drop(put("radio", (dmx.x - 0.2, DY0 + 0.22), rot_z=math.radians(90), z=ctr_z + 0.02, fit=(0, 0.3)))
-drop(put("dead_plant", (dmx.x - 0.2, DY0 + 0.85), rot_z=math.radians(80), z=ctr_z + 0.02))
-place("beer_bottle", (dmx.x - 0.18, DY1 - 0.26), ctr_z)
-place("bottle_dark", (dmx.x - 0.28, DY1 - 0.16), ctr_z)
+kal = put("kallax", (X0 - DD / 2, (DY0 + DY1) / 2), rot_z=math.radians(90), back=(0, X0 - DD + 0.02, -1))
+grubby(kal, 14.0)
+kmn_, kmx_ = bounds(tree(kal))
+KX_ = kmx_.x - 0.18
+KCOLS = [kmn_.y + (i + 0.5) * (kmx_.y - kmn_.y) / 4 for i in range(4)]
+_kl = shelf_levels(KX_, KCOLS[0], kmx_.z - 0.05)
+def _near(z): return min(_kl, key=lambda v: abs(v - z))
+KROWS = {"top": _near(kmn_.z + 0.75 * (kmx_.z - kmn_.z)), "mid": _near(kmn_.z + 0.5 * (kmx_.z - kmn_.z)), "low": _near(kmn_.z)}
+def KCELL(col, row): return KX_, KCOLS[col], KROWS[row]
+x_, y_, z_ = KCELL(2, "top"); drop(put("radio", (x_, y_), rot_z=math.radians(90), z=z_ + 0.02, fit=(0, 0.26)))
+x_, y_, z_ = KCELL(3, "top"); place("beer_bottle", (x_, y_ - 0.07), z_); place("bottle_dark", (x_ - 0.05, y_ + 0.08), z_)
+x_, y_, z_ = KCELL(0, "mid"); place("books_old", (x_, y_), z_, rot_z=math.radians(90), fit=(0, 0.28))
+x_, y_, z_ = KCELL(1, "mid"); drop(put("dead_plant", (x_, y_), rot_z=math.radians(80), z=z_ + 0.02, fit=(2, 0.30)))
+x_, y_, z_ = KCELL(2, "mid"); place("magazines", (x_, y_), z_, rot_z=math.radians(90), fit=(0, 0.28))
+x_, y_, z_ = KCELL(3, "mid"); place("basket", (x_, y_), z_, rot_z=math.radians(90), fit=(0, 0.29))
+x_, y_, z_ = KCELL(0, "low"); place("clothes", (x_, y_), z_, rot_z=math.radians(90), fit=(0, 0.29))
+x_, y_, z_ = KCELL(1, "low"); place("toy_train", (x_ + 0.05, y_), z_, rot_z=1.2)
+x_, y_, z_ = KCELL(2, "low"); place("beer_can", (x_, y_ - 0.06), z_); place("beer_can", (x_ - 0.06, y_ + 0.07), z_)
+x_, y_, z_ = KCELL(3, "low"); place("book_stack", (x_, y_), z_, rot_z=math.radians(90), fit=(0, 0.28))
 
 # south-west recess: her floral armchair and the old telly, a standard lamp in the corner
 SB = Y0 - g["SOFA_D"]
@@ -520,14 +569,14 @@ on_seat("lighter", smx.x - 0.75, 0.8, dy=0.08)
 on_seat("beer_can", smn.x + 1.35, dy=0.05)
 syringe((smn.x + 1.25, smn.y - 0.03), 0.0, rot=0.3)
 
-# dresser counter: an overflowing ashtray, and the foil, blackened spoon, lighter and syringes someone uses
-full_ashtray((dmx.x - 0.2, DY0 + 0.50), ctr_z, n=10)
-dz = ctr_z
-foil((dmx.x - 0.22, DY0 + 1.18), dz, 0.3)
-burnt_spoon((dmx.x - 0.14, DY0 + 1.28), dz, 1.9)
-place("lighter", (dmx.x - 0.30, DY0 + 1.30), dz, rot_z=-0.5)
-syringe((dmx.x - 0.12, DY0 + 1.08), dz, rot=1.2)
-syringe((dmx.x - 0.32, DY0 + 1.10), dz, rot=-0.3, capped=True)
+# in the KALLAX at eye level: an overflowing ashtray, and the foil, blackened spoon, lighter and syringes someone uses
+x_, y_, z_ = KCELL(0, "top"); full_ashtray((x_ + 0.02, y_), z_, n=10)
+x_, y_, z_ = KCELL(1, "top")
+foil((x_ + 0.02, y_ - 0.06), z_, 0.3)
+burnt_spoon((x_ - 0.08, y_ + 0.08), z_, 1.9)
+place("lighter", (x_ + 0.10, y_ + 0.10), z_, rot_z=-0.5)
+syringe((x_ + 0.08, y_ - 0.02), z_, rot=1.4)
+syringe((x_ - 0.10, y_ - 0.10), z_, rot=-0.3, capped=True)
 
 # kitchen worktop: tablets left out (bottle, blister sheets) and the cigarettes; cans by the bin
 place("pill_sheets", (KX - 0.45, kmn.y + 1.10), work_z, rot_z=0.4, fit=(0, 0.16))
