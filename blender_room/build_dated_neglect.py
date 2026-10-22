@@ -282,6 +282,8 @@ kit = put("kitchen_pariz", (KX - 0.3, 0.725), rot_z=math.radians(-90), back=(0, 
 for o in list(tree(kit)):                         # no fresh fruit or new-looking bowls in this kitchen
     if o.type == "MESH" and any(s.material and s.material.name.split(".")[0] in ("apple", "wooden bowl") for s in o.material_slots):
         bpy.data.objects.remove(o, do_unlink=True)
+for o in list(tree(kit)):                         # one of the model's drawers has stray geometry reaching back across the room
+    if o.type == "MESH" and bounds([o])[0].x < X1 + 0.1: bpy.data.objects.remove(o, do_unlink=True)
 recolour(kit, "wood_drawers dark", (0.30, 0.16, 0.07), "oak80s")    # dark grey doors -> tired brown 'oak effect'
 recolour(kit, "wood_drawers light", (0.30, 0.16, 0.07), "oak80s")
 recolour(kit, "wood_cabinets", (0.30, 0.16, 0.07), "oak80s")
@@ -308,7 +310,6 @@ place("dishes", (KX - 0.22, sy0 - 0.34), work_z, rot_z=math.radians(-90))
 # the takeaway, the teapot; north of the sink: empties and a mug
 place("tray_dirty", (WX - 0.02, kmn.y + 0.32), work_z, rot_z=math.radians(-80))
 place("takeaway_bag", (WX + 0.05, kmn.y + 0.85), work_z, rot_z=0.3)
-place("teapot", (WX - 0.05, kmn.y + 1.15), work_z, fit=(0, 0.22))
 for i, (k, dy, dx) in enumerate((("beer_bottle", 0.12, -0.12), ("beer_can", 0.24, 0.02), ("beer_bottle", 0.33, -0.05),
                                  ("bottle_glass", 0.47, 0.05), ("beer_can", 0.60, -0.15), ("coffee_cup", 0.72, -0.05))):
     y_ = sy1 + dy
