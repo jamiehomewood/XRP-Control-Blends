@@ -121,6 +121,9 @@ for o in sc.objects:
 
 # ---- 3. furniture from the BlenderKit library --------------------------------------------------------------
 LIBRARY = {}
+_old = bpy.data.collections.get("BK_library")
+if _old:                                          # drop the copies a previous build loaded (placed pieces keep their mesh data)
+    for o in list(_old.objects): bpy.data.objects.remove(o, do_unlink=True)
 with bpy.data.libraries.load(LIB, link=False) as (src, dst):
     dst.objects = list(src.objects)
 for o in dst.objects:
@@ -203,19 +206,59 @@ lamp = put("standard_lamp", (X0 + 0.2, SB + 0.2))
 for o in list(lamp.children_recursive):          # its flex is a long curve that trails across the whole floor
     if "wire" in o.name.lower(): bpy.data.objects.remove(o, do_unlink=True)
 
-# kitchen beyond the arch (pieces turned -90deg to face back into the room, -X): the old cooker, a cabinet used as a counter, piled with dirty dishes and rubbish
+# kitchen recess beyond the arch: an old fitted kitchen along the back wall (turned -90deg so the fronts face
+# back into the room, -X; a model's own X runs along the wall). Left to right as seen from the room:
+# the little freestanding cooker, the sink run with its wall cupboards, the old fridge in the corner.
 KX = X1 + g["KITCHEN_D"]; KY0, KY1 = g["KITCHEN_Y"]
-put("cooker", (KX - 0.3, KY0 + 1.2), rot_z=math.radians(-90), back=(0, KX - 0.02, +1))
-cnt = put("sideboard", (KX - 0.3, KY0 + 2.3), rot_z=math.radians(-90), back=(0, KX - 0.02, +1))
-cz = top_of(cnt)
-put("dishes", (KX - 0.32, KY0 + 2.0), rot_z=math.radians(-90), z=cz)
-put("takeaway_bag", (KX - 0.3, KY0 + 2.65), rot_z=0.3, z=cz)
-put("bottle_glass", (KX - 0.45, KY0 + 2.85), z=cz)
-put("coffee_cup", (KX - 0.5, KY0 + 1.75), z=cz)
-put("bin_full", (KX - 0.3, KY0 + 3.3))
-put("binbag_a", (KX - 0.45, KY0 + 0.45), rot_z=0.7)
+
+def tree(root): return [root, *root.children_recursive]
+
+def recolour(root, name, rgb, tag):
+    """Multiply the colour of material `name` on this piece by rgb (an image-textured colour keeps its grain)."""
+    for o in tree(root):
+        if o.type != "MESH": continue
+        for s in o.material_slots:
+            if not s.material or not s.material.name.startswith(name): continue
+            nm = f"{name}_{tag}"
+            m = bpy.data.materials.get(nm)
+            if not m:
+                m = s.material.copy(); m.name = nm; nt = m.node_tree
+                bsdf = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED"); bi = bsdf.inputs["Base Color"]
+                img = next((n for n in nt.nodes if n.type == "TEX_IMAGE" and "base" in n.image.name.lower()), None) if bi.links else None
+                if img or bi.links:
+                    mix = nt.nodes.new("ShaderNodeMix"); mix.data_type = "RGBA"; mix.blend_type = "MULTIPLY"
+                    mix.inputs["Factor"].default_value = 1.0; mix.inputs[7].default_value = (*rgb, 1)
+                    nt.links.new(img.outputs["Color"] if img else bi.links[0].from_socket, mix.inputs[6]); nt.links.new(mix.outputs[2], bi)
+                else:
+                    bi.default_value = (*rgb, 1)
+            s.link = "OBJECT"; s.material = m
+
+kit = put("kitchen_pariz", (KX - 0.3, 0.725), rot_z=math.radians(-90), back=(0, KX - 0.02, +1))
+for o in list(tree(kit)):                         # no fresh fruit or new-looking bowls in this kitchen
+    if o.type == "MESH" and any(s.material and s.material.name.split(".")[0] in ("apple", "wooden bowl") for s in o.material_slots):
+        bpy.data.objects.remove(o, do_unlink=True)
+recolour(kit, "wood_drawers dark", (0.55, 0.30, 0.14), "oak80s")    # dark grey doors -> tired brown 'oak effect'
+recolour(kit, "wood_drawers light", (0.95, 0.85, 0.66), "cream")
+recolour(kit, "wood_cabinets", (0.92, 0.82, 0.62), "cream")
+recolour(kit, "wood_tabletop", (0.80, 0.68, 0.50), "stained")
+kmn, kmx = bounds(tree(kit))
+work_z = max(bounds([o])[1].z for o in tree(kit) if o.type == "MESH" and bounds([o])[1].z < 1.2)   # top of the worktop
+fr = put("fridge_retro", (KX - 0.38, KY1 - 0.38), rot_z=math.radians(-90), back=(0, KX - 0.02, +1))
+recolour(fr, "Metal.005", (0.80, 0.75, 0.62), "cream")              # a yellowed cream, not the shiny orange
+put("cooker", (KX - 0.3, kmn.y - 0.3), rot_z=math.radians(-90), back=(0, KX - 0.02, +1))
+
+# the worktop: dirty dishes by the sink, a takeaway bag, bottles, a mug
+put("dishes", (KX - 0.32, kmn.y + 1.35), rot_z=math.radians(-90), z=work_z)
+put("takeaway_bag", (KX - 0.3, kmn.y + 0.35), rot_z=0.3, z=work_z)
+put("bottle_glass", (KX - 0.42, kmn.y + 2.45), z=work_z)
+put("bottle_dark", (KX - 0.30, kmn.y + 2.60), z=work_z)
+put("coffee_cup", (KX - 0.45, kmn.y + 2.1), z=work_z)
+put("teapot", (KX - 0.35, kmn.y + 0.75), z=work_z, fit=(0, 0.22))
+# on the kitchen floor: the overflowing bin and bags that never went out
+put("bin_full", (KX - 0.85, kmn.y + 0.2))
+put("binbag_a", (X1 + 0.55, KY0 + 0.35), rot_z=0.7)
 put("binbag_b", (X1 + 0.6, KY1 - 0.35), rot_z=-0.4)
-put("box_open", (X1 + 1.2, KY1 - 0.3), rot_z=0.2)
+put("box_open", (KX - 1.0, KY1 - 0.3), rot_z=0.2)
 
 # hall beyond the door: rubbish bags and boxes waiting to go out (they never did)
 HY = Y0 - g["WALL_T"] - g["HALL_W"]           # far wall of the hall
