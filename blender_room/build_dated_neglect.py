@@ -168,17 +168,57 @@ def put(key, xy, rot_z=0.0, z=0.0, scale=1.0, fit=None, back=None):
     bpy.context.view_layer.update()
     return root
 
+def tree(root): return [root, *root.children_recursive]
+
 def top_of(root):
     return bounds([root, *root.children_recursive])[1].z
+
+def drop(root, above=0.25):
+    """Let a placed piece fall straight down onto whatever is under it (worktop, sink, table), so nothing floats
+    or sinks: rays from just above its bottom over its footprint, and its lowest point goes to the highest hit."""
+    parts = [o for o in [root, *root.children_recursive] if o.type == "MESH"]
+    mn, mx = bounds(parts)
+    for o in parts: o.hide_viewport = True
+    bpy.context.view_layer.update(); dg = bpy.context.evaluated_depsgraph_get()
+    zs = []
+    for fx in (0.2, 0.5, 0.8):
+        for fy in (0.2, 0.5, 0.8):
+            h = sc.ray_cast(dg, Vector((mn.x + (mx.x - mn.x) * fx, mn.y + (mx.y - mn.y) * fy, mn.z + above)), Vector((0, 0, -1)), distance=above + 1.5)
+            if h[0]: zs.append(h[1].z)
+    for o in parts: o.hide_viewport = False
+    if zs: root.location.z += max(zs) - mn.z
+    bpy.context.view_layer.update()
+    return root
+
+def place(key, xy, z, **kw):
+    """put() then drop() onto the surface below."""
+    return drop(put(key, xy, z=z + 0.02, **kw))
+
+def plate_with_cutlery(xy, z, rot=0.0):
+    """A dirty dinner plate with the knife and fork left lying across it (cutlery from the worn tableware set)."""
+    pl = place("plate_dirty", xy, z, rot_z=rot)
+    pmn, pmx = bounds(tree(pl)); top = pmx.z
+    tray = LIBRARY["tray_dirty"]
+    for i, nm in enumerate(("fork", "Knife")):
+        src = next(c for c in tray.children if c.name.split(".")[0] == nm)
+        c = copy_tree(src); c.parent = None
+        c.matrix_world = src.matrix_world.copy()
+        cmn, cmx = bounds(tree(c)); ctr = (cmn + cmx) / 2
+        ang = rot + 0.5 + i * 0.25
+        off = Vector((math.cos(rot) * (0.03 - i * 0.05), math.sin(rot) * (0.03 - i * 0.05), 0))
+        c.matrix_world = (Matrix.Translation((xy[0] + off.x, xy[1] + off.y, top - 0.012 - cmn.z + ctr.z))
+                          @ Matrix.Rotation(ang, 4, "Z") @ Matrix.Translation(-ctr) @ c.matrix_world)
+    bpy.context.view_layer.update()
+    return pl
 
 # north alcove: her old sofa, the side table with the clutter of someone who no longer clears up
 AB = Y1 + GD                                  # alcove back wall
 sofa = put("sofa", ((GX0 + GX1) / 2 - 0.22, AB - 0.4), back=(1, AB - 0.02, +1))
 st = put("side_table", (GX1 - 0.32, AB - 0.32), back=(1, AB - 0.02, +1))
 tz = top_of(st)
-put("coffee_cup", (GX1 - 0.42, AB - 0.40), z=tz)
-put("bottle_dark", (GX1 - 0.22, AB - 0.24), z=tz)
-put("teapot", (GX1 - 0.28, AB - 0.45), z=tz, fit=(0, 0.22))
+plate_with_cutlery((GX1 - 0.34, AB - 0.40), tz, rot=0.3)
+place("coffee_cup", (GX1 - 0.18, AB - 0.22), tz)
+place("beer_can", (GX1 - 0.50, AB - 0.20), tz)
 smn, smx = bounds([sofa, *sofa.children_recursive])
 seat_z = smn.z + (smx.z - smn.z) * 0.48
 put("magazines", (smn.x + 0.35, (smn.y + smx.y) / 2 - 0.05), rot_z=0.4, z=seat_z)
@@ -193,15 +233,18 @@ DY0, DY1 = g["DRESSER_Y"]; DD = g["DRESSER_D"]
 dres = put("dresser", (X0 - DD / 2, (DY0 + DY1) / 2), rot_z=math.radians(90), fit=(0, (DY1 - DY0) - 0.06), back=(0, X0 - DD + 0.02, -1))   # fit uses the model's own (unturned) axes
 dmn, dmx = bounds([dres, *dres.children_recursive])
 ctr_z = dmn.z + (dmx.z - dmn.z) * 0.44          # the counter between the cupboards and the glass top
-put("radio", (dmx.x - 0.2, DY0 + 0.35), rot_z=math.radians(90), z=ctr_z, fit=(0, 0.3))
-put("dead_plant", (dmx.x - 0.2, (DY0 + DY1) / 2), rot_z=math.radians(80), z=ctr_z)
-put("bottle_glass", (dmx.x - 0.18, DY1 - 0.32), z=ctr_z)
-put("bottle_dark", (dmx.x - 0.28, DY1 - 0.22), z=ctr_z)
+drop(put("radio", (dmx.x - 0.2, DY0 + 0.35), rot_z=math.radians(90), z=ctr_z + 0.02, fit=(0, 0.3)))
+drop(put("dead_plant", (dmx.x - 0.2, (DY0 + DY1) / 2 - 0.1), rot_z=math.radians(80), z=ctr_z + 0.02))
+place("beer_bottle", (dmx.x - 0.18, DY1 - 0.30), ctr_z)
+place("bottle_dark", (dmx.x - 0.28, DY1 - 0.20), ctr_z)
+plate_with_cutlery((dmx.x - 0.22, (DY0 + DY1) / 2 + 0.38), ctr_z, rot=-0.4)
 
 # south-west recess: her floral armchair and the old telly, a standard lamp in the corner
 SB = Y0 - g["SOFA_D"]
 put("armchair_floral", (X0 + 0.75, SB + 0.42), rot_z=math.radians(170), fit=(1, g["SOFA_D"] - 0.04), back=(1, SB + 0.02, -1))
 put("tv_legs", (g["SOFA_X1"] - 0.55, SB + 0.35), rot_z=math.radians(200), back=(1, SB + 0.02, -1))
+plate_with_cutlery((X0 + 1.45, SB + 0.35), 0.0, rot=1.1)
+place("beer_can", (X0 + 1.3, SB + 0.15), 0.0)
 lamp = put("standard_lamp", (X0 + 0.2, SB + 0.2))
 for o in list(lamp.children_recursive):          # its flex is a long curve that trails across the whole floor
     if "wire" in o.name.lower(): bpy.data.objects.remove(o, do_unlink=True)
@@ -210,8 +253,6 @@ for o in list(lamp.children_recursive):          # its flex is a long curve that
 # back into the room, -X; a model's own X runs along the wall). Left to right as seen from the room:
 # the little freestanding cooker, the sink run with its wall cupboards, the old fridge in the corner.
 KX = X1 + g["KITCHEN_D"]; KY0, KY1 = g["KITCHEN_Y"]
-
-def tree(root): return [root, *root.children_recursive]
 
 def recolour(root, name, rgb, tag, match=None):
     """Multiply the colour of material `name` on this piece by rgb (an image-textured colour keeps its grain).
@@ -253,20 +294,79 @@ def _orange(m):
     c = b.inputs["Base Color"].default_value if b else (0, 0, 0, 1)
     return c[0] > 0.6 and c[2] < 0.2
 recolour(fr, "fridge_body", (0.78, 0.74, 0.62), "cream", match=_orange)   # a yellowed cream, not the shiny orange
-put("cooker", (KX - 0.3, kmn.y - 0.3), rot_z=math.radians(-90), back=(0, KX - 0.02, +1))
+stove = put("stove_white", (KX - 0.33, kmn.y - 0.32), rot_z=math.radians(-90), back=(0, KX - 0.02, +1))   # tall white old-fashioned cooker
+smn_, smx_ = bounds(tree(stove))
 
-# the worktop: dirty dishes by the sink, a takeaway bag, bottles, a mug
-put("dishes", (KX - 0.32, kmn.y + 1.35), rot_z=math.radians(-90), z=work_z)
-put("takeaway_bag", (KX - 0.3, kmn.y + 0.35), rot_z=0.3, z=work_z)
-put("bottle_glass", (KX - 0.42, kmn.y + 2.45), z=work_z)
-put("bottle_dark", (KX - 0.30, kmn.y + 2.60), z=work_z)
-put("coffee_cup", (KX - 0.45, kmn.y + 2.1), z=work_z)
-put("teapot", (KX - 0.35, kmn.y + 0.75), z=work_z, fit=(0, 0.22))
-# on the kitchen floor: the overflowing bin and bags that never went out
-put("bin_full", (KX - 0.85, kmn.y + 0.2))
-put("binbag_a", (X1 + 0.55, KY0 + 0.35), rot_z=0.7)
+# the sink, so things can go in it or be kept out of it
+sink = [o for o in tree(kit) if o.type == "MESH" and any(sl.material and sl.material.name.split(".")[0] == "sink" for sl in o.material_slots)]
+sy0, sy1 = (bounds(sink)[0].y, bounds(sink)[1].y) if sink else (kmx.y - 1.1, kmx.y - 0.6)
+WX = KX - 0.30                                    # a line along the worktop, clear of the wall cupboards
+# in and by the sink: dirty plates, the pile of washing-up on the drainer
+plate_with_cutlery((WX - 0.02, (sy0 + sy1) / 2), work_z, rot=0.2)
+place("dishes", (WX, sy0 - 0.32), work_z, rot_z=math.radians(-90))
+# along the rest of the worktop (south of the sink, towards the cooker): the tray from last night's dinner,
+# the takeaway, the teapot; north of the sink: empties and a mug
+place("tray_dirty", (WX - 0.02, kmn.y + 0.32), work_z, rot_z=math.radians(-80))
+place("takeaway_bag", (WX + 0.05, kmn.y + 0.85), work_z, rot_z=0.3)
+place("teapot", (WX - 0.05, kmn.y + 1.15), work_z, fit=(0, 0.22))
+for i, (k, dy, dx) in enumerate((("beer_bottle", 0.12, -0.12), ("beer_can", 0.24, 0.02), ("beer_bottle", 0.33, -0.05),
+                                 ("bottle_glass", 0.47, 0.05), ("beer_can", 0.60, -0.15), ("coffee_cup", 0.72, -0.05))):
+    y_ = sy1 + dy
+    if y_ < kmx.y - 0.06: place(k, (WX + dx, y_), work_z, rot_z=i * 0.9)
+place("beer_can", (KX - 0.9, KY1 - 0.9), 0.0)                       # one dropped on the floor
+
+# the overflowing bin, tucked into the corner beside the cooker if it fits there, else the front corner by the arch
+binr = put("bin_full", (0, 0)); bmn, bmx = bounds(tree(binr)); bw = max(bmx.x - bmn.x, bmx.y - bmn.y)
+if smn_.y - KY0 >= bw + 0.02:
+    binr.location += Vector((KX - 0.02 - bw / 2 - (bmn.x + bmx.x) / 2, KY0 + 0.01 + bw / 2 - (bmn.y + bmx.y) / 2, 0))
+else:
+    binr.location += Vector((X1 + g["ARCH_T"] + 0.02 + bw / 2 - (bmn.x + bmx.x) / 2, KY0 + 0.01 + bw / 2 - (bmn.y + bmx.y) / 2, 0))
+bpy.context.view_layer.update()
+put("binbag_a", (X1 + 0.75, KY0 + 0.95), rot_z=0.7)
 put("binbag_b", (X1 + 0.6, KY1 - 0.35), rot_z=-0.4)
 put("box_open", (KX - 1.0, KY1 - 0.3), rot_z=0.2)
+
+# children's magnetic letters on the fridge door, low down where a grandchild could reach: NANA and a scatter
+fmn, fmx = bounds(tree(fr))
+mags = {c.name.split(".")[0].replace("Letter_", ""): c for c in LIBRARY["magnets"].children}
+R = Matrix(((0, 0, -1, 0), (-1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 0, 1)))   # set's +X -> world -Y, +Y -> up, +Z -> out of the door (-X)
+def magnet(ch, y, z, tilt=0.0, scale=1.45):
+    src = mags[ch]; c = copy_tree(src); c.parent = None; c.matrix_world = src.matrix_world.copy()
+    cmn, cmx = bounds(tree(c)); ctr = (cmn + cmx) / 2; th = cmx.z - cmn.z
+    c.matrix_world = (Matrix.Translation((fmn.x - th * scale / 2 - 0.001, y, z)) @ Matrix.Rotation(tilt, 4, "X")
+                      @ R @ Matrix.Scale(scale, 4) @ Matrix.Translation(-ctr) @ c.matrix_world)
+random.seed(11)
+for i, ch in enumerate("NANA"):
+    magnet(ch, fmx.y - 0.16 - i * 0.052, 0.92 + random.uniform(-0.012, 0.012), random.uniform(-0.15, 0.15))
+for ch in "BOJ7S3RT":
+    if ch in mags:
+        magnet(ch, random.uniform(fmn.y + 0.1, fmx.y - 0.12), random.uniform(0.38, 0.80), random.uniform(-0.6, 0.6))
+
+# crayon drawings low on the walls (a grandchild was here): image planes just off the wall surface
+def crayon_art(img, ctr, normal, width):
+    path = os.path.join(ROOT, "labels", f"crayon_{img}.png")
+    im = bpy.data.images.load(path, check_existing=True)
+    m = bpy.data.materials.get(f"Crayon_{img}")
+    if not m:
+        m = bpy.data.materials.new(f"Crayon_{img}"); m.use_nodes = True; nt = m.node_tree
+        b = nt.nodes["Principled BSDF"]; t = nt.nodes.new("ShaderNodeTexImage"); t.image = im
+        nt.links.new(t.outputs["Color"], b.inputs["Base Color"]); nt.links.new(t.outputs["Alpha"], b.inputs["Alpha"])
+        b.inputs["Roughness"].default_value = 0.7
+        try: m.surface_render_method = "DITHERED"
+        except Exception: pass
+    n = Vector(normal); r = Vector((0, 0, 1)).cross(n); up = Vector((0, 0, 1))
+    h = width * im.size[1] / im.size[0]; c = Vector(ctr) + n * 0.003
+    vs = [c - r * width / 2 - up * h / 2, c + r * width / 2 - up * h / 2, c + r * width / 2 + up * h / 2, c - r * width / 2 + up * h / 2]
+    me = bpy.data.meshes.new(f"Crayon_{img}"); me.from_pydata([tuple(v) for v in vs], [], [(0, 1, 2, 3)])
+    uv = me.uv_layers.new(); [setattr(uv.data[i], "uv", xy_) for i, xy_ in enumerate([(0, 0), (1, 0), (1, 1), (0, 1)])]
+    me.materials.append(m); o = bpy.data.objects.new(f"Crayon_{img}", me); coll.objects.link(o)
+    o.visible_shadow = False
+    return o
+crayon_art("house", (X1, -1.95, 0.50), (-1, 0, 0), 0.72)          # east wall, beside the kitchen arch
+crayon_art("rainbow", (-0.2, Y0, 0.48), (0, 1, 0), 0.75)           # south wall, between the door and the telly
+if X1 - GX1 > 0.8:
+    crayon_art("flowers", ((GX1 + X1) / 2, Y1, 0.46), (0, -1, 0), min(0.62, X1 - GX1 - 0.25))   # north wall, past the alcove
+crayon_art("scribble", (1.05, Y0 - g["WALL_T"] - g["HALL_W"], 0.62), (0, 1, 0), 0.55)          # the hall, seen through the door
 
 # the hall door: the shell's copy of the main room's door leaf comes out misplaced in this file, so build a
 # plain panelled door instead, swung open into the hall the same way (it never covers the real floor)
