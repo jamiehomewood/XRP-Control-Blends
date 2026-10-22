@@ -125,7 +125,7 @@ regrime(lambda o: True, "dated_hall_paint", hall)
 regrime(lambda o: True, "Gloss_white", gloss)
 # low scuffs on the lower wall panels (below the dado rail) as a second layer: the lower panels get the scuffed copy
 for o in shell.all_objects:
-    if o.type == "MESH" and o.name.startswith("RWall") and o.matrix_world.translation.z < 0.6:
+    if o.type == "MESH" and o.name.startswith("RWall") and max((o.matrix_world @ Vector(c)).z for c in o.bound_box) < 1.0:   # (origins are all at 0: use the mesh's height)
         for s in o.material_slots:
             if s.material == walls: s.material = walls_low
 # the bare ceiling light is dimmer and warmer (old bulb, dirty shade)
