@@ -582,8 +582,9 @@ def spot_on(name, src, target, width, power):
     ld.spot_size = 2 * math.atan((width / 2 + 0.1) / d.length); ld.spot_blend = 0.6
     lo = bpy.data.objects.new(name, ld); coll.objects.link(lo); lo.location = src
     lo.rotation_euler = d.to_track_quat("-Z", "Y").to_euler(); return lo
-spot_on("Neglect_dresser_light", (X0 + 1.4, (DY0 + DY1) / 2, 2.2), (X0 - 0.3, (DY0 + DY1) / 2, 0.95), DY1 - DY0, 45)
-spot_on("Neglect_bookcase_light", ((BR[0] + BR[1]) / 2, Y1 - 1.4, 2.2), ((BR[0] + BR[1]) / 2, Y1 + 0.2, 1.0), BR[1] - BR[0], 45)
+spot_on("Neglect_dresser_light", (X0 + 1.4, (DY0 + DY1) / 2, 2.2), (X0 - 0.3, (DY0 + DY1) / 2, 0.95), DY1 - DY0, 80)
+spot_on("Neglect_bookcase_light", ((BR[0] + BR[1]) / 2, Y1 - 1.4, 2.2), ((BR[0] + BR[1]) / 2, Y1 + 0.2, 1.0), BR[1] - BR[0], 80)
+sc.view_settings.exposure = 0.9                    # no direct sun on a dull day: open the exposure up a little
 
 # the garden photo behind the window instead of the plain modelled outside
 for o in list(sc.collection.objects):
