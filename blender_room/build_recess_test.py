@@ -529,7 +529,7 @@ if MODERN:
         plant("potted_plant_02", PX0 + 0.35, -1.0, zt, 0.55); plant("potted_plant_01", PX0 + 0.35, -0.2, zt, 0.75)
         zt = planter("planter_b", PX0 + 0.35, 2.0, 0.5, 1.4, 0.45)
         plant("potted_plant_01", PX0 + 0.35, 1.6, zt, 0.8); plant("potted_plant_04", PX0 + 0.35, 2.4, zt, 0.35)
-        plant("potted_plant_02", PX1 - 0.3, -1.7, PZ, 0.7); plant("potted_plant_04", PX1 - 0.25, 2.75, PZ, 0.4)
+        plant("potted_plant_04", PX1 - 0.25, 2.75, PZ, 0.4)   # (the pot that stood at y -1.7 landed inside the west recess)
         # bistro table and two chairs
         TXc, TYc = PX0 + 1.3, 0.55
         for o_ in (("RGarden_table_top", 0.32, 0.02, (TXc, TYc, PZ + 0.72)), ("RGarden_table_stem", 0.025, 0.7, (TXc, TYc, PZ + 0.36)), ("RGarden_table_foot", 0.22, 0.015, (TXc, TYc, PZ + 0.008))):
