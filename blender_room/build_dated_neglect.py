@@ -235,8 +235,8 @@ DY0, DY1 = g["DRESSER_Y"]; DD = g["DRESSER_D"]
 dres = put("dresser", (X0 - DD / 2, (DY0 + DY1) / 2), rot_z=math.radians(90), fit=(0, (DY1 - DY0) - 0.06), back=(0, X0 - DD + 0.02, -1))   # fit uses the model's own (unturned) axes
 dmn, dmx = bounds([dres, *dres.children_recursive])
 ctr_z = dmn.z + (dmx.z - dmn.z) * 0.44          # the counter between the cupboards and the glass top
-drop(put("radio", (dmx.x - 0.2, DY0 + 0.25), rot_z=math.radians(90), z=ctr_z + 0.02, fit=(0, 0.3)))
-drop(put("dead_plant", (dmx.x - 0.2, (DY0 + DY1) / 2 - 0.1), rot_z=math.radians(80), z=ctr_z + 0.02))
+drop(put("radio", (dmx.x - 0.2, DY0 + 0.22), rot_z=math.radians(90), z=ctr_z + 0.02, fit=(0, 0.3)))
+drop(put("dead_plant", (dmx.x - 0.2, DY0 + 0.85), rot_z=math.radians(80), z=ctr_z + 0.02))
 place("beer_bottle", (dmx.x - 0.18, DY1 - 0.26), ctr_z)
 place("bottle_dark", (dmx.x - 0.28, DY1 - 0.16), ctr_z)
 
@@ -244,8 +244,6 @@ place("bottle_dark", (dmx.x - 0.28, DY1 - 0.16), ctr_z)
 SB = Y0 - g["SOFA_D"]
 put("armchair_floral", (X0 + 0.75, SB + 0.42), rot_z=math.radians(170), fit=(1, g["SOFA_D"] - 0.04), back=(1, SB + 0.02, -1))
 put("tv_legs", (g["SOFA_X1"] - 0.55, SB + 0.35), rot_z=math.radians(200), back=(1, SB + 0.02, -1))
-plate_with_cutlery((X0 + 1.45, SB + 0.35), 0.0, rot=1.1)
-place("beer_can", (X0 + 1.3, SB + 0.15), 0.0)
 lamp = put("standard_lamp", (X0 + 0.2, SB + 0.2))
 for o in list(lamp.children_recursive):          # its flex is a long curve that trails across the whole floor
     if "wire" in o.name.lower(): bpy.data.objects.remove(o, do_unlink=True)
@@ -501,13 +499,13 @@ for i in range(4):
     butt((GX1 - random.uniform(0.2, 0.7), AB - random.uniform(0.55, 0.85)), 0.003, random.uniform(0, 6.3), math.pi / 2)
 
 # dresser counter: an overflowing ashtray, and the foil, blackened spoon, lighter and syringes someone uses
-full_ashtray((dmx.x - 0.2, DY0 + 0.55), ctr_z, n=10)
+full_ashtray((dmx.x - 0.2, DY0 + 0.50), ctr_z, n=10)
 dz = ctr_z
-foil((dmx.x - 0.22, DY0 + 1.02), dz, 0.3)
-burnt_spoon((dmx.x - 0.14, DY0 + 1.12), dz, 1.9)
-place("lighter", (dmx.x - 0.30, DY0 + 1.14), dz, rot_z=-0.5)
-syringe((dmx.x - 0.12, DY0 + 0.93), dz, rot=1.2)
-syringe((dmx.x - 0.32, DY0 + 0.96), dz, rot=-0.3, capped=True)
+foil((dmx.x - 0.22, DY0 + 1.18), dz, 0.3)
+burnt_spoon((dmx.x - 0.14, DY0 + 1.28), dz, 1.9)
+place("lighter", (dmx.x - 0.30, DY0 + 1.30), dz, rot_z=-0.5)
+syringe((dmx.x - 0.12, DY0 + 1.08), dz, rot=1.2)
+syringe((dmx.x - 0.32, DY0 + 1.10), dz, rot=-0.3, capped=True)
 
 # kitchen worktop: tablets left out (bottle, blister sheets) and the cigarettes; cans by the bin
 place("pill_sheets", (KX - 0.45, kmn.y + 1.10), work_z, rot_z=0.4, fit=(0, 0.16))
@@ -518,10 +516,14 @@ for i in range(3):
     place("beer_can", (X1 + 0.25 + 0.09 * i, KY0 + 0.55 + random.uniform(-0.04, 0.04)), 0.0, rot_z=random.uniform(0, 6))
 place("whisky", (KX - 0.85, KY1 - 0.65), 0.0, rot_z=1.0)
 
-# by the armchair: another empty bottle and butts ground into the carpet
-place("whisky", (X0 + 1.55, SB + 0.12), 0.0)
-for i in range(5):
-    butt((X0 + random.uniform(1.1, 1.6), SB + random.uniform(0.1, 0.6)), 0.003, random.uniform(0, 6.3), math.pi / 2)
+# the armchair recess is full (chair and telly): last night's plate left on the chair seat, an empty can and
+# an overflowing ashtray on top of the telly
+plate_with_cutlery((X0 + 0.75, SB + 0.78), 0.75, rot=1.1)
+tv = [o for o in coll.objects if o.parent is None and o.name.startswith("Vintage TV")]
+if tv:
+    tmn, tmx = bounds(tree(tv[0]))
+    place("beer_can", (tmn.x + 0.12, (tmn.y + tmx.y) / 2), tmx.z + 0.05)
+    full_ashtray((tmx.x - 0.18, (tmn.y + tmx.y) / 2 + 0.05), tmx.z + 0.05, n=8)
 
 # hall beyond the door: rubbish bags and boxes waiting to go out (they never did)
 HY = Y0 - g["WALL_T"] - g["HALL_W"]           # far wall of the hall
