@@ -252,16 +252,23 @@ for k_ in (0, 1):
     xc_ = BR[0] + 0.03 + BWID / 4 + k_ * BWID / 2
     iv = put("ivar", (xc_, RYB - 0.15), fit=(2, min(2.0, g["RH"] - 0.12)), back=(1, RYB, +1))
     grubby(iv, 12.0 + k_); ivars.append(iv)
-IVAR_FILL = [[("books_old", -0.12), ("magazines", 0.20)], [("basket", -0.10), ("coffee_cup", 0.22)], [("book_stack", -0.05), ("bottle_dark", 0.25)],
-             [("clothes", 0.0)], [("books", -0.15), ("beer_can", 0.15), ("pill_sheets", 0.27)], [("toy_train", -0.18), ("box_open", 0.12)],
-             [("books_old", 0.10), ("letters", -0.2)], [("basket", 0.12), ("beer_bottle", -0.2)], [("book_stack", 0.0)], [("clothes", 0.05)]]
+IVAR_FILL = [[("books_old", -0.22), ("magazines", 0.12), ("coffee_cup", 0.30)],
+             [("basket", -0.18), ("letters", 0.10), ("beer_can", 0.28)],
+             [("book_stack", -0.12), ("bottle_dark", 0.15), ("pill_bottle", 0.27)],
+             [("clothes", -0.10), ("books", 0.22)],
+             [("books", -0.22), ("beer_can", 0.02), ("pill_sheets", 0.20), ("lighter", 0.30)],
+             [("toy_train", -0.25), ("box_open", 0.08)],
+             [("books_old", 0.15), ("letters", -0.18), ("coffee_cup", -0.30)],
+             [("basket", 0.15), ("beer_bottle", -0.12), ("beer_bottle", -0.25)],
+             [("book_stack", 0.12), ("magazines", -0.18)],
+             [("clothes", 0.12), ("beer_can", -0.20), ("box_damaged", -0.05)]]
 fi = 0
 for iv in ivars:
     imn, imx = bounds(tree(iv)); ixc = (imn.x + imx.x) / 2; iyc = (imn.y + imx.y) / 2
     for lz in shelf_levels(ixc, iyc - 0.02, imx.z - 0.25):
         if lz < 0.02 or lz > 1.75: continue
         for key, dx in IVAR_FILL[fi % len(IVAR_FILL)]:
-            w_ = 0.30 if key in ("clothes", "book_stack", "basket", "magazines", "box_open", "books_old") else None
+            w_ = {"clothes": 0.30, "book_stack": 0.26, "basket": 0.28, "magazines": 0.24, "box_open": 0.28, "box_damaged": 0.22, "books_old": 0.26, "letters": 0.2}.get(key)
             kw = {"fit": (0, w_)} if w_ else {}
             place(key, (ixc + dx * (imx.x - imn.x) / 0.79, iyc - 0.01), lz, rot_z=random.uniform(-0.25, 0.25), **kw)
         fi += 1
