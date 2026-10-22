@@ -450,12 +450,29 @@ for o in list(bpy.data.collections["Room"].all_objects):
         bottom, top = 0.145, 0.695; k = (RAD_TOP - bottom) / (top - bottom)
         c.scale.z *= k; c.location.z = bottom + (o.location.z - bottom) * k; coll.objects.link(c)
     elif o.name in ("Door", "Door_handle", "Door_handle_plate") or o.name.startswith("Door_panel"):
-        c = o.copy(); c.name = "RC_" + o.name; c["recess_test"] = True; c.parent = None
-        hinge = Vector((DOOR_X - DOOR_W / 2, Y0 - 0.005, 0))
-        c.matrix_world = Matrix.Translation(hinge) @ Matrix.Rotation(DOOR_OPEN, 4, "Z") @ Matrix.Translation(-hinge) @ o.matrix_world
-        coll.objects.link(c)
+        continue                                                  # copying the main room's leaf is unreliable: built below
     elif o.name.startswith("Radiator_pipe"):
         c = o.copy(); c.name = "RC_" + o.name; c["recess_test"] = True; coll.objects.link(c)
+
+# ---- dated: a plain four-panel door, gloss painted with a brass knob, swung open out into the hall ------------
+# (built here rather than copied from the main room: the copied leaf landed beside the kitchen arch)
+if not MODERN:
+    _hinge = Vector((DOOR_X - DOOR_W / 2, Y0 - 0.005, 0))
+    _drot = Matrix.Translation(_hinge) @ Matrix.Rotation(DOOR_OPEN, 4, "Z") @ Matrix.Translation(-_hinge)
+    _brass = bpy.data.materials.get("Door_brass") or bpy.data.materials.new("Door_brass")
+    _brass.use_nodes = True; _bb = _brass.node_tree.nodes["Principled BSDF"]
+    _bb.inputs["Base Color"].default_value = (0.45, 0.33, 0.14, 1); _bb.inputs["Metallic"].default_value = 1.0; _bb.inputs["Roughness"].default_value = 0.45
+    def _door_box(nm, size, loc, mat):
+        o = box(nm, (1, 1, 1), (0, 0, 0), mat)
+        o.matrix_world = _drot @ Matrix.LocRotScale(Vector(loc), None, Vector(size)); return o
+    _DY = Y0 - 0.025
+    _door_box("RDoor_leaf_slab", (DOOR_W - 0.006, 0.04, DOOR_H - 0.008), (DOOR_X, _DY, DOOR_H / 2), gloss)
+    for _zc in (0.5, 1.42):
+        for _xo in (-0.19, 0.19):
+            for _sd in (+1, -1):
+                _door_box(f"RDoor_leaf_panel_{_zc}_{_xo}_{_sd}", (0.30, 0.012, 0.70 if _zc > 1 else 0.62), (DOOR_X + _xo, _DY + _sd * 0.024, _zc), gloss)
+    for _sd in (+1, -1):
+        _door_box(f"RDoor_leaf_knob_{_sd}", (0.06, 0.05, 0.06), (DOOR_X + DOOR_W / 2 - 0.07, _DY + _sd * 0.045, 1.0), _brass)
 
 # ---- modern: radiator, venetian blinds and a little garden outside the window ------------------
 if MODERN:
