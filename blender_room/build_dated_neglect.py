@@ -22,6 +22,7 @@ random.seed(7)
 fp = os.path.join(ROOT, "build_recess_test.py")
 g = {"__file__": fp, "__name__": "__main__", "STYLE": "dated", "SCENE_NAME_OVERRIDE": "DatedNeglect",
      "COLL_NAME_OVERRIDE": "DatedNeglectShell", "OUT_OVERRIDE": OUT, "BOOK_RECESS": (-3.05, -1.25, 0.40)}
+GARDEN = "garden_backdrop.jpg"                    # a garden photo outside the window (labels/)
 exec(compile(open(fp, encoding="utf-8").read(), fp, "exec"), g)
 X0, X1, Y0, Y1 = g["X0"], g["X1"], g["Y0"], g["Y1"]
 GX0, GX1 = g["GLENDA_X"]; GD = g["GLENDA_D"]
@@ -285,8 +286,19 @@ for o in list(tree(kit)):                         # no fresh fruit or new-lookin
 hd = [o for o in tree(kit) if o.type == "MESH" and o.name.startswith("handle") and len(o.data.vertices) > 0]
 if hd:
     h = min(hd, key=lambda o: bounds([o])[0].z)
-    hmn, hmx = bounds([h]); pivot = Vector((hmx.x, hmx.y, (hmn.z + hmx.z) / 2))     # the screw still holding it
-    h.matrix_world = Matrix.Translation(pivot) @ Matrix.Rotation(-0.28, 4, "X") @ Matrix.Translation(-pivot) @ h.matrix_world
+    bpy.context.view_layer.update()
+    hmn, hmx = bounds([h]); pivot = Vector(((hmn.x + hmx.x) / 2, hmx.y, (hmn.z + hmx.z) / 2))   # the screw still holding it
+    h.matrix_world = Matrix.Translation(pivot) @ Matrix.Rotation(-0.12, 4, "X") @ Matrix.Translation(-pivot) @ h.matrix_world
+# the model leaves some fronts without handles: the bottom drawers of the middle units and the two doors under
+# the right-hand drawers. Copy the matching (mirrored-pair) handles down onto them.
+bpy.context.view_layer.update()
+for o in [o for o in tree(kit) if o.type == "CURVE" and o.name.startswith("handle") and any(m.type == "MIRROR" for m in o.modifiers)]:
+    pn = o.parent.name if o.parent else ""
+    dz = -0.295 if pn.startswith("large drawer") else (-0.135 if pn.startswith("small drawer") else None)
+    if dz is None: continue
+    c = o.copy(); coll.objects.link(c); c.parent = o.parent; c.matrix_parent_inverse = o.matrix_parent_inverse.copy()
+    c.matrix_world = Matrix.Translation((0, 0, dz)) @ o.matrix_world
+bpy.context.view_layer.update()
 recolour(kit, "wood_drawers dark", (0.30, 0.16, 0.07), "oak80s")    # dark grey doors -> tired brown 'oak effect'
 recolour(kit, "wood_drawers light", (0.30, 0.16, 0.07), "oak80s")
 recolour(kit, "wood_cabinets", (0.30, 0.16, 0.07), "oak80s")
@@ -308,7 +320,15 @@ sy0, sy1 = (bounds(sink)[0].y, bounds(sink)[1].y) if sink else (kmx.y - 1.1, kmx
 WX = KX - 0.30                                    # a line along the worktop, clear of the wall cupboards
 # in and by the sink: dirty plates, the pile of washing-up on the drainer
 plate_with_cutlery((WX - 0.02, (sy0 + sy1) / 2), work_z, rot=0.2)
-place("dishes", (KX - 0.22, sy0 - 0.34), work_z, rot_z=math.radians(-90))
+_front = min(bounds([o])[0].x for o in tree(kit) if o.type == "MESH" and any(sl.material and "tabletop" in sl.material.name for sl in o.material_slots))
+def keep_on_top(root, margin=0.04):
+    """slide a piece back so nothing overhangs the front edge of the worktop (and not into the wall)"""
+    mn_, mx_ = bounds(tree(root))
+    if mn_.x < _front + margin: root.location.x += _front + margin - mn_.x
+    mn_, mx_ = bounds(tree(root))
+    if mx_.x > KX - 0.03: root.location.x -= mx_.x - (KX - 0.03)
+    bpy.context.view_layer.update(); return drop(root)
+keep_on_top(place("dishes", (KX - 0.22, sy0 - 0.34), work_z, rot_z=math.radians(-90)))
 # along the rest of the worktop (south of the sink, towards the cooker): the tray from last night's dinner,
 # the takeaway, the teapot; north of the sink: empties and a mug
 place("tray_dirty", (WX - 0.02, kmn.y + 0.32), work_z, rot_z=math.radians(-80))
@@ -317,7 +337,7 @@ for i, (k, dy, dx) in enumerate((("beer_bottle", 0.12, -0.12), ("beer_can", 0.24
                                  ("bottle_glass", 0.47, 0.05), ("beer_can", 0.60, -0.15), ("coffee_cup", 0.72, -0.05))):
     y_ = sy1 + dy
     if y_ < kmx.y - 0.06: place(k, (WX + dx, y_), work_z, rot_z=i * 0.9)
-place("beer_can", (KX - 0.9, KY1 - 0.9), 0.0)                       # one dropped on the floor
+put("beer_can", (KX - 0.95, kmn.y + 0.55))                        # one dropped on the floor
 
 # the overflowing bin, tucked into the corner beside the cooker if it fits there, else the front corner by the arch
 binr = put("bin_full", (0, 0)); bmn, bmx = bounds(tree(binr)); bw = max(bmx.x - bmn.x, bmx.y - bmn.y)
@@ -337,7 +357,10 @@ R = Matrix(((0, 0, -1, 0), (-1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 0, 1)))   # set's
 def magnet(ch, y, z, tilt=0.0, scale=1.45):
     src = mags[ch]; c = copy_tree(src); c.parent = None; c.matrix_world = src.matrix_world.copy()
     cmn, cmx = bounds(tree(c)); ctr = (cmn + cmx) / 2; th = cmx.z - cmn.z
-    c.matrix_world = (Matrix.Translation((fmn.x - th * scale / 2 - 0.001, y, z)) @ Matrix.Rotation(tilt, 4, "X")
+    dg = bpy.context.evaluated_depsgraph_get()
+    hit = sc.ray_cast(dg, Vector((fmn.x - 0.3, y, z)), Vector((1, 0, 0)), distance=1.0)
+    door_x = hit[1].x if hit[0] else fmn.x
+    c.matrix_world = (Matrix.Translation((door_x - th * scale / 2 - 0.0005, y, z)) @ Matrix.Rotation(tilt, 4, "X")
                       @ R @ Matrix.Scale(scale, 4) @ Matrix.Translation(-ctr) @ c.matrix_world)
 random.seed(11)
 for i, ch in enumerate("NANA"):
@@ -513,8 +536,9 @@ place("pill_bottle", (KX - 0.46, kmn.y + 0.62), work_z)
 place("cig_pack", (KX - 0.42, kmn.y + 1.45), work_z, rot_z=-1.2, fit=(2, 0.10))
 full_ashtray((KX - 0.45, sy1 + 0.85), work_z, n=7) if sy1 + 0.85 < kmx.y - 0.08 else None
 for i in range(3):
-    place("beer_can", (X1 + 0.25 + 0.09 * i, KY0 + 0.55 + random.uniform(-0.04, 0.04)), 0.0, rot_z=random.uniform(0, 6))
-place("whisky", (KX - 0.85, KY1 - 0.65), 0.0, rot_z=1.0)
+    put("beer_can", (KX - 0.75 - 0.1 * i, kmn.y + 0.15 + random.uniform(-0.04, 0.04)), rot_z=random.uniform(0, 6))
+place("whisky", (KX - 0.40, kmx.y - 0.12), work_z, rot_z=1.0)          # empties on the worktop by the fridge
+place("beer_can", (KX - 0.48, kmx.y - 0.24), work_z)
 
 # the armchair recess is full (chair and telly): last night's plate left on the chair seat, an empty can and
 # an overflowing ashtray on top of the telly
@@ -525,6 +549,102 @@ if tv:
     place("beer_can", (tmn.x + 0.12, (tmn.y + tmx.y) / 2), tmx.z + 0.05)
     full_ashtray((tmx.x - 0.18, (tmn.y + tmx.y) / 2 + 0.05), tmx.z + 0.05, n=8)
 
+# ---- tiles, light, curtains, the garden, a child's blocks ------------------------------------------------------
+# dirty splashback tiles on the kitchen's back wall, between the worktop and the wall cupboards
+TILE = bpy.data.materials.get("Neglect_tiles")
+if not TILE:
+    TILE = bpy.data.materials.new("Neglect_tiles"); TILE.use_nodes = True; nt = TILE.node_tree; b = nt.nodes["Principled BSDF"]
+    uvn = nt.nodes.new("ShaderNodeUVMap")
+    br = nt.nodes.new("ShaderNodeTexBrick"); nt.links.new(uvn.outputs[0], br.inputs["Vector"])
+    br.offset = 0.0; br.inputs["Scale"].default_value = 1.0; br.inputs["Brick Width"].default_value = 0.15; br.inputs["Row Height"].default_value = 0.15
+    br.inputs["Mortar Size"].default_value = 0.004; br.inputs["Color1"].default_value = (0.80, 0.77, 0.66, 1); br.inputs["Color2"].default_value = (0.74, 0.71, 0.60, 1)
+    br.inputs["Mortar"].default_value = (0.20, 0.16, 0.10, 1)
+    nz = nt.nodes.new("ShaderNodeTexNoise"); nz.inputs["Scale"].default_value = 6; nz.inputs["Detail"].default_value = 8; nt.links.new(uvn.outputs[0], nz.inputs["Vector"])
+    rp = nt.nodes.new("ShaderNodeValToRGB"); nt.links.new(nz.outputs["Fac"], rp.inputs[0]); rp.color_ramp.elements[0].position = 0.45; rp.color_ramp.elements[1].position = 0.75
+    mx = nt.nodes.new("ShaderNodeMix"); mx.data_type = "RGBA"; mx.blend_type = "MULTIPLY"; mx.inputs[7].default_value = (0.42, 0.32, 0.15, 1)
+    nt.links.new(rp.outputs[0], mx.inputs["Factor"]); nt.links.new(br.outputs["Color"], mx.inputs[6]); nt.links.new(mx.outputs[2], b.inputs["Base Color"])
+    b.inputs["Roughness"].default_value = 0.25
+    bump = nt.nodes.new("ShaderNodeBump"); bump.inputs["Strength"].default_value = 0.3; nt.links.new(br.outputs["Fac"], bump.inputs["Height"]); nt.links.new(bump.outputs[0], b.inputs["Normal"])
+def wall_quad(name, pts, uvs, mat):
+    me = bpy.data.meshes.new(name); me.from_pydata(pts, [], [(0, 1, 2, 3)])
+    uv = me.uv_layers.new(); [setattr(uv.data[i], "uv", c) for i, c in enumerate(uvs)]
+    me.materials.append(mat); o = bpy.data.objects.new(name, me); coll.objects.link(o); return o
+tx = KX - 0.004; ty0, ty1 = KY0 + 0.002, fmn.y; tz0, tz1 = work_z - 0.05, 1.55
+wall_quad("Neglect_splashback", [(tx, ty1, tz0), (tx, ty0, tz0), (tx, ty0, tz1), (tx, ty1, tz1)],
+          [(0, 0), (ty1 - ty0, 0), (ty1 - ty0, tz1 - tz0), (0, tz1 - tz0)], TILE)
+
+# the two dark recesses (dresser, bookcase) get a soft warm light, as if from a lamp nearby
+def soft_light(name, loc, size, rot, power):
+    ld = bpy.data.lights.get(name) or bpy.data.lights.new(name, "AREA")
+    ld.shape = "RECTANGLE"; ld.size, ld.size_y = size; ld.energy = power; ld.color = (1.0, 0.82, 0.6)
+    lo = bpy.data.objects.new(name, ld); coll.objects.link(lo); lo.location = loc; lo.rotation_euler = rot; return lo
+soft_light("Neglect_dresser_light", (X0 + 0.25, (DY0 + DY1) / 2, 2.15), (0.4, DY1 - DY0), (0, math.radians(30), 0), 60)
+soft_light("Neglect_bookcase_light", ((BR[0] + BR[1]) / 2, Y1 - 0.25, 2.15), (BR[1] - BR[0], 0.4), (math.radians(30), 0, 0), 60)
+
+# the garden photo behind the window instead of the plain modelled outside
+for o in list(sc.collection.objects):
+    if o.name.startswith("Outside_") and o.type == "MESH": sc.collection.objects.unlink(o)
+gimg = bpy.data.images.load(os.path.join(ROOT, "labels", GARDEN), check_existing=True)
+gm = bpy.data.materials.get("Garden_photo_dull") or bpy.data.materials.new("Garden_photo_dull")
+gm.use_nodes = True; nt = gm.node_tree; nt.nodes.clear()
+o_ = nt.nodes.new("ShaderNodeOutputMaterial"); em = nt.nodes.new("ShaderNodeEmission"); gt = nt.nodes.new("ShaderNodeTexImage")
+gt.image = gimg; gt.extension = "EXTEND"; em.inputs["Strength"].default_value = 0.8
+nt.links.new(gt.outputs["Color"], em.inputs["Color"]); nt.links.new(em.outputs[0], o_.inputs[0])
+WY = g["WIN_Y"]; GW = 7.5; GH = GW * gimg.size[1] / gimg.size[0]; GXp = X0 - g["T"] - 2.5; GZ = g["EYE"] + 0.35
+gp = wall_quad("Neglect_garden_photo", [(GXp, WY - GW / 2, GZ - GH / 2), (GXp, WY + GW / 2, GZ - GH / 2), (GXp, WY + GW / 2, GZ + GH / 2), (GXp, WY - GW / 2, GZ + GH / 2)],
+               [(0, 0), (1, 0), (1, 1), (0, 1)], gm)
+gp.visible_shadow = False; gp.visible_diffuse = False; gp.visible_glossy = False
+
+# dirty old curtains on a rail, drawn to the sides of the window and hanging just past the sill
+cur_base = soft("Neglect_curtain_base", (0.50, 0.32, 0.14), 0.85)
+cur = grimed(cur_base, "dirty", stain=(0.35, 0.28, 0.18), scale=3.0, amount=0.7, band=(0.6, 1.2, True), tint=(0.85, 0.80, 0.70), seed=9.0)
+WW, WS, WH = g["WIN_W"], g["WIN_SILL"], g["WIN_H"]
+rail_z = WS + WH + 0.14; cx = X0 + 0.09; cz0 = WS - 0.12
+def curtain(name, ya, yb):
+    import bmesh
+    def build(bm):
+        nu, nv = 40, 12
+        vs = [[bm.verts.new((cx + 0.025 * math.sin(2 * math.pi * (u / nu) * (abs(yb - ya) / 0.09)) * (1 - 0.3 * v / nv) + random.uniform(-0.002, 0.002),
+                             ya + (yb - ya) * u / nu, rail_z - 0.03 - (rail_z - 0.03 - cz0) * v / nv + (0.015 * math.sin(u * 0.7) if v == nv else 0)))
+               for u in range(nu + 1)] for v in range(nv + 1)]
+        for v in range(nv):
+            for u in range(nu): bm.faces.new((vs[v][u], vs[v][u + 1], vs[v + 1][u + 1], vs[v + 1][u]))
+    return mesh_obj(name, build, cur)
+wy0_, wy1_ = WY - WW / 2, WY + WW / 2
+curtain("Neglect_curtain_l", wy0_ - 0.30, wy0_ + 0.22)
+curtain("Neglect_curtain_r", wy1_ - 0.22, wy1_ + 0.30)
+mesh_obj("Neglect_curtain_rail", lambda bm: (cyl(bm, 0.012, 0.012, WW + 0.8, 0.0, zc=0.0),), soft("Neglect_rail", (0.30, 0.20, 0.10), 0.5, metal=0.3)).matrix_world = \
+    Matrix.Translation((cx, wy0_ - 0.4, rail_z)) @ Matrix.Rotation(math.pi / 2, 4, "Z")
+
+# a grandchild's wooden number blocks left on the floor at the edge of the rug
+BLOCK_COLS = [(0.75, 0.12, 0.08), (0.10, 0.30, 0.70), (0.15, 0.55, 0.15), (0.90, 0.70, 0.08), (0.85, 0.40, 0.08), (0.45, 0.15, 0.55)]
+wood = soft("Neglect_block_wood", (0.78, 0.60, 0.38), 0.6)
+def block(n, xy, rot, tumble=0.0):
+    import bmesh
+    S = 0.05
+    e = empty(f"Neglect_block_{n}", xy, 0.012, rot)   # resting on the carpet pile / rug
+    col = soft(f"Neglect_block_paint_{n}", BLOCK_COLS[n % len(BLOCK_COLS)], 0.45)
+    def build(bm):
+        bmesh.ops.create_cube(bm, size=S); bmesh.ops.translate(bm, vec=(0, 0, S / 2), verts=bm.verts)
+        bmesh.ops.bevel(bm, geom=list(bm.edges), offset=0.003, segments=2, affect="EDGES")
+    cube = mesh_obj(f"Neglect_block_cube_{n}", build, wood, e); cube.data.materials.append(col)
+    for f in cube.data.polygons:
+        if f.area > (S * 0.8) ** 2: f.material_index = 1          # the big flat faces painted, the bevels bare wood
+    for k, (loc, rr) in enumerate((((0, 0, S + 0.0006), (0, 0, 0)), ((0, -S / 2 - 0.0006, S / 2), (math.pi / 2, 0, 0)), ((S / 2 + 0.0006, 0, S / 2), (math.pi / 2, 0, math.pi / 2)))):
+        cu = bpy.data.curves.new(f"Neglect_block_num_{n}_{k}", "FONT"); cu.body = str(n); cu.size = 0.038; cu.extrude = 0.0004
+        cu.align_x = "CENTER"; cu.align_y = "CENTER"
+        cu.materials.append(soft("Neglect_block_num", (0.96, 0.94, 0.88), 0.5))
+        t = bpy.data.objects.new(f"Neglect_block_num_{n}_{k}", cu); coll.objects.link(t); t.parent = e
+        t.location = loc; t.rotation_euler = rr
+    for c in e.children: c.matrix_parent_inverse = Matrix.Identity(4)
+    if tumble:                                    # one knocked over onto its side
+        e.matrix_world = e.matrix_world @ Matrix.Translation((0, 0, S / 2)) @ Matrix.Rotation(tumble, 4, "X") @ Matrix.Translation((0, 0, -S / 2))
+    return e
+random.seed(5)
+for n, (x_, y_, r_, t_) in enumerate(((1.45, -1.30, 0.3, 0), (1.53, -1.24, -0.2, 0), (1.49, -1.27, 0.1, 0), (1.70, -1.05, 0.9, math.pi / 2),
+                                      (1.30, -1.10, -0.5, 0), (1.85, -1.38, 0.4, 0)), start=1):
+    b = block(n, (x_, y_), r_, t_)
+    if n == 3: b.location.z += 0.05              # the third stacked on the first two... almost
 # hall beyond the door: rubbish bags and boxes waiting to go out (they never did)
 HY = Y0 - g["WALL_T"] - g["HALL_W"]           # far wall of the hall
 put("binbag_a", (0.55, HY + 0.4), rot_z=-0.3)
@@ -534,7 +654,7 @@ put("box_open", (1.65, HY + 0.3), z=0.34, rot_z=-0.25)
 put("magazines", (2.2, HY + 0.3), rot_z=0.2)
 
 # on the projected floor only flat things: the worn rug and post pushed under the door
-put("rug", (0.1, 1.2), rot_z=math.radians(90), fit=(0, 1.9))
+put("rug", (0.0, 0.0), rot_z=0.0, fit=(0, 3.6))
 for i in range(3):
     put("letters", (0.9 + random.uniform(-0.3, 0.3), Y0 + 0.35 + random.uniform(0, 0.3)), rot_z=random.uniform(-1, 1), z=0.004 + i * 0.002, scale=0.8)
 
