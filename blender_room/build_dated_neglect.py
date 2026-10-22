@@ -217,16 +217,14 @@ def plate_with_cutlery(xy, z, rot=0.0):
 
 # north alcove: her old sofa, the side table with the clutter of someone who no longer clears up
 AB = Y1 + GD                                  # alcove back wall
-SW = min(2.1, (GX1 - 0.6) - (GX0 + 0.05))         # her old, sagging, stained couch, filling the alcove up to the side table
-sofa = put("sofa_old", ((GX0 + 0.05 + GX1 - 0.6) / 2, AB - 0.45), fit=(0, SW), back=(1, AB - 0.02, +1))
-st = put("side_table", (GX1 - 0.32, AB - 0.32), back=(1, AB - 0.02, +1))
-tz = top_of(st)
-plate_with_cutlery((GX1 - 0.34, AB - 0.40), tz, rot=0.3)
-place("coffee_cup", (GX1 - 0.18, AB - 0.22), tz)
+# her old, sagging, stained couch fills the whole alcove; what she needs is piled on the seat around where she sits
+sofa = put("sofa_old", ((GX0 + GX1) / 2, AB - 0.45), fit=(0, (GX1 - GX0) - 0.04), back=(1, AB - 0.02, +1))
 smn, smx = bounds([sofa, *sofa.children_recursive])
-seat_z = smn.z + (smx.z - smn.z) * 0.48
-drop(put("magazines", (smn.x + 0.40, (smn.y + smx.y) / 2 - 0.12), rot_z=0.4, z=smx.z), above=0.05)
-drop(put("letters", (smx.x - 0.40, (smn.y + smx.y) / 2 - 0.15), rot_z=-0.3, z=smx.z), above=0.05)
+SEAT_Y = smn.y + 0.28                             # over the front of the seat cushions
+def on_seat(key, x, rot=0.0, **kw): return drop(put(key, (x, SEAT_Y + kw.pop("dy", 0.0)), rot_z=rot, z=smx.z, **kw), above=0.05)
+on_seat("magazines", smn.x + 0.40, 0.4)
+on_seat("letters", smx.x - 0.42, -0.3)
+pl_ = plate_with_cutlery((smn.x + 0.95, SEAT_Y), smx.z, rot=0.3)
 
 # bookcase recess, north wall west of the alcove
 BR = g["BOOK_RECESS"]
@@ -248,7 +246,10 @@ put("armchair_floral", (X0 + 0.75, SB + 0.42), rot_z=math.radians(170), fit=(1, 
 put("tv_legs", (g["SOFA_X1"] - 0.55, SB + 0.35), rot_z=math.radians(200), back=(1, SB + 0.02, -1))
 lamp = put("standard_lamp", (X0 + 0.2, SB + 0.2))
 for o in list(lamp.children_recursive):          # its flex is a long curve that trails across the whole floor
-    if "wire" in o.name.lower(): bpy.data.objects.remove(o, do_unlink=True)
+    if "wire" in o.name.lower():
+        for c in list(o.children):                # the lamp's bulb hangs off the flex: keep it where it is
+            mw = c.matrix_world.copy(); c.parent = lamp; c.matrix_world = mw
+        bpy.data.objects.remove(o, do_unlink=True)
 
 # kitchen recess beyond the arch: an old fitted kitchen along the back wall (turned -90deg so the fronts face
 # back into the room, -X; a model's own X runs along the wall). Left to right as seen from the room:
@@ -511,16 +512,13 @@ def burnt_spoon(xy, z, rot):
     bpy.context.view_layer.update(); return drop(c)
 
 random.seed(21)
-# side table by her sofa: the green ashtray with a cigarette left burning down, a lighter, and her tablets
-place("ashtray_cig", (GX1 - 0.50, AB - 0.20), tz)
-place("lighter", (GX1 - 0.16, AB - 0.45), tz, rot_z=0.8)
-place("pill_bottle", (GX1 - 0.10, AB - 0.30), tz)
-# alcove floor by the side table: an empty can, an empty whisky bottle, a used syringe (a sharps risk for the nurse)
-place("beer_can", (GX1 - 0.10, AB - 0.72), 0.0)
-place("whisky", (GX1 - 0.25, AB - 0.80), 0.0, rot_z=0.4)
-syringe((GX1 - 0.55, AB - 0.62), 0.0, rot=2.4)
-for i in range(4):
-    butt((GX1 - random.uniform(0.2, 0.7), AB - random.uniform(0.55, 0.85)), 0.003, random.uniform(0, 6.3), math.pi / 2)
+# on the couch: the green ashtray with a cigarette burning down balanced on the arm, her tablets, a lighter, a can;
+# a used syringe down by the front of the couch (a sharps risk for the nurse)
+drop(put("ashtray_cig", (smx.x - 0.13, (smn.y + smx.y) / 2 - 0.05), z=smx.z), above=0.05)
+on_seat("pill_bottle", smx.x - 0.85)
+on_seat("lighter", smx.x - 0.75, 0.8, dy=0.08)
+on_seat("beer_can", smn.x + 1.35, dy=0.05)
+syringe((smn.x + 1.25, smn.y - 0.03), 0.0, rot=0.3)
 
 # dresser counter: an overflowing ashtray, and the foil, blackened spoon, lighter and syringes someone uses
 full_ashtray((dmx.x - 0.2, DY0 + 0.50), ctr_z, n=10)
@@ -575,12 +573,17 @@ wall_quad("Neglect_splashback", [(tx, ty1, tz0), (tx, ty0, tz0), (tx, ty0, tz1),
           [(0, 0), (ty1 - ty0, 0), (ty1 - ty0, tz1 - tz0), (0, tz1 - tz0)], TILE)
 
 # the two dark recesses (dresser, bookcase) get a soft warm light, as if from a lamp nearby
-def soft_light(name, loc, size, rot, power):
-    ld = bpy.data.lights.get(name) or bpy.data.lights.new(name, "AREA")
-    ld.shape = "RECTANGLE"; ld.size, ld.size_y = size; ld.energy = power; ld.color = (1.0, 0.82, 0.6); ld.spread = math.radians(50)
-    lo = bpy.data.objects.new(name, ld); coll.objects.link(lo); lo.location = loc; lo.rotation_euler = rot; return lo
-soft_light("Neglect_dresser_light", (X0 + 0.25, (DY0 + DY1) / 2, 2.15), (0.4, DY1 - DY0), (0, math.radians(30), 0), 18)
-soft_light("Neglect_bookcase_light", ((BR[0] + BR[1]) / 2, Y1 - 0.25, 2.15), (BR[1] - BR[0], 0.4), (math.radians(30), 0, 0), 18)
+def spot_on(name, src, target, width, power):
+    ld = bpy.data.lights.get(name)
+    if ld and ld.type != "SPOT": ld.name = name + "_old"; ld = None
+    ld = ld or bpy.data.lights.new(name, "SPOT")
+    d = Vector(target) - Vector(src)
+    ld.energy = power; ld.color = (1.0, 0.84, 0.64); ld.shadow_soft_size = 0.15
+    ld.spot_size = 2 * math.atan((width / 2 + 0.1) / d.length); ld.spot_blend = 0.6
+    lo = bpy.data.objects.new(name, ld); coll.objects.link(lo); lo.location = src
+    lo.rotation_euler = d.to_track_quat("-Z", "Y").to_euler(); return lo
+spot_on("Neglect_dresser_light", (X0 + 1.4, (DY0 + DY1) / 2, 2.2), (X0 - 0.3, (DY0 + DY1) / 2, 0.95), DY1 - DY0, 45)
+spot_on("Neglect_bookcase_light", ((BR[0] + BR[1]) / 2, Y1 - 1.4, 2.2), ((BR[0] + BR[1]) / 2, Y1 + 0.2, 1.0), BR[1] - BR[0], 45)
 
 # the garden photo behind the window instead of the plain modelled outside
 for o in list(sc.collection.objects):
