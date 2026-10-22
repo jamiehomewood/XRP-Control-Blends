@@ -217,15 +217,16 @@ def plate_with_cutlery(xy, z, rot=0.0):
 
 # north alcove: her old sofa, the side table with the clutter of someone who no longer clears up
 AB = Y1 + GD                                  # alcove back wall
-sofa = put("sofa", ((GX0 + GX1) / 2 - 0.22, AB - 0.4), back=(1, AB - 0.02, +1))
+SW = min(2.1, (GX1 - 0.6) - (GX0 + 0.05))         # her old, sagging, stained couch, filling the alcove up to the side table
+sofa = put("sofa_old", ((GX0 + 0.05 + GX1 - 0.6) / 2, AB - 0.45), fit=(0, SW), back=(1, AB - 0.02, +1))
 st = put("side_table", (GX1 - 0.32, AB - 0.32), back=(1, AB - 0.02, +1))
 tz = top_of(st)
 plate_with_cutlery((GX1 - 0.34, AB - 0.40), tz, rot=0.3)
 place("coffee_cup", (GX1 - 0.18, AB - 0.22), tz)
 smn, smx = bounds([sofa, *sofa.children_recursive])
 seat_z = smn.z + (smx.z - smn.z) * 0.48
-put("magazines", (smn.x + 0.35, (smn.y + smx.y) / 2 - 0.05), rot_z=0.4, z=seat_z)
-put("letters", (smx.x - 0.35, (smn.y + smx.y) / 2 - 0.08), rot_z=-0.3, z=seat_z + 0.01)
+drop(put("magazines", (smn.x + 0.40, (smn.y + smx.y) / 2 - 0.12), rot_z=0.4, z=smx.z), above=0.05)
+drop(put("letters", (smx.x - 0.40, (smn.y + smx.y) / 2 - 0.15), rot_z=-0.3, z=smx.z), above=0.05)
 
 # bookcase recess, north wall west of the alcove
 BR = g["BOOK_RECESS"]
@@ -576,10 +577,10 @@ wall_quad("Neglect_splashback", [(tx, ty1, tz0), (tx, ty0, tz0), (tx, ty0, tz1),
 # the two dark recesses (dresser, bookcase) get a soft warm light, as if from a lamp nearby
 def soft_light(name, loc, size, rot, power):
     ld = bpy.data.lights.get(name) or bpy.data.lights.new(name, "AREA")
-    ld.shape = "RECTANGLE"; ld.size, ld.size_y = size; ld.energy = power; ld.color = (1.0, 0.82, 0.6)
+    ld.shape = "RECTANGLE"; ld.size, ld.size_y = size; ld.energy = power; ld.color = (1.0, 0.82, 0.6); ld.spread = math.radians(50)
     lo = bpy.data.objects.new(name, ld); coll.objects.link(lo); lo.location = loc; lo.rotation_euler = rot; return lo
-soft_light("Neglect_dresser_light", (X0 + 0.25, (DY0 + DY1) / 2, 2.15), (0.4, DY1 - DY0), (0, math.radians(30), 0), 60)
-soft_light("Neglect_bookcase_light", ((BR[0] + BR[1]) / 2, Y1 - 0.25, 2.15), (BR[1] - BR[0], 0.4), (math.radians(30), 0, 0), 60)
+soft_light("Neglect_dresser_light", (X0 + 0.25, (DY0 + DY1) / 2, 2.15), (0.4, DY1 - DY0), (0, math.radians(30), 0), 18)
+soft_light("Neglect_bookcase_light", ((BR[0] + BR[1]) / 2, Y1 - 0.25, 2.15), (BR[1] - BR[0], 0.4), (math.radians(30), 0, 0), 18)
 
 # the garden photo behind the window instead of the plain modelled outside
 for o in list(sc.collection.objects):
