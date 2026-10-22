@@ -87,7 +87,28 @@ def regrime(obj_filter, mat_name, newmat):
                 o.material_slots[i].material = newmat
 
 M = bpy.data.materials
-walls = grimed(M["Wallpaper"], "neglect", stain=(0.30, 0.25, 0.12), scale=1.3, amount=0.75, band=(1.25, 2.2, False), tint=(0.86, 0.82, 0.70), seed=1.0)
+def paint_above(mat, z0, paint):
+    """copy of the wallpaper that is plain paint above height z0 (the dado rail), wallpaper below"""
+    for old in (mat.name + "_paintabove", mat.name + "_paintabove_neglect"):   # rebuilt every run (grimed() would reuse a stale copy)
+        if bpy.data.materials.get(old): bpy.data.materials.get(old).name = old + "_old"
+    m = mat.copy(); m.name = mat.name + "_paintabove"; nt = m.node_tree
+    b = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED"); bi = b.inputs["Base Color"]
+    paper = bi.links[0].from_socket if bi.links else None
+    geo = nt.nodes.new("ShaderNodeNewGeometry"); sep = nt.nodes.new("ShaderNodeSeparateXYZ"); nt.links.new(geo.outputs["Position"], sep.inputs[0])
+    gt = nt.nodes.new("ShaderNodeMath"); gt.operation = "GREATER_THAN"; gt.inputs[1].default_value = z0; nt.links.new(sep.outputs["Z"], gt.inputs[0])
+    nz = nt.nodes.new("ShaderNodeTexNoise"); nz.inputs["Scale"].default_value = 3.0; nz.inputs["Detail"].default_value = 6; nt.links.new(geo.outputs["Position"], nz.inputs["Vector"])
+    rp = nt.nodes.new("ShaderNodeValToRGB"); nt.links.new(nz.outputs["Fac"], rp.inputs[0])
+    rp.color_ramp.elements[0].position = 0.35; rp.color_ramp.elements[0].color = (*paint, 1)
+    rp.color_ramp.elements[1].position = 0.75; rp.color_ramp.elements[1].color = (paint[0] * 0.82, paint[1] * 0.78, paint[2] * 0.66, 1)   # patchy, grubby emulsion
+    mx = nt.nodes.new("ShaderNodeMix"); mx.data_type = "RGBA"; mx.inputs[6].default_value = (*bi.default_value[:3], 1)
+    if paper: nt.links.new(paper, mx.inputs[6])
+    nt.links.new(rp.outputs[0], mx.inputs[7]); nt.links.new(gt.outputs[0], mx.inputs["Factor"]); nt.links.new(mx.outputs[2], bi)
+    if b.inputs["Normal"].links:                  # no wallpaper emboss on the painted part
+        nsrc = b.inputs["Normal"].links[0].from_socket
+        nm = nt.nodes.new("ShaderNodeMix"); nm.data_type = "VECTOR"; nt.links.new(gt.outputs[0], nm.inputs["Factor"])
+        nt.links.new(nsrc, nm.inputs[4]); nt.links.new(geo.outputs["Normal"], nm.inputs[5]); nt.links.new(nm.outputs[1], b.inputs["Normal"])
+    return m
+walls = grimed(paint_above(M["Wallpaper"], 0.92, (0.80, 0.74, 0.58)), "neglect", stain=(0.30, 0.25, 0.12), scale=1.3, amount=0.75, band=(1.25, 2.2, False), tint=(0.86, 0.82, 0.70), seed=1.0)
 walls_low = grimed(M["Wallpaper"], "scuff", stain=(0.35, 0.30, 0.22), scale=2.5, amount=0.6, band=(0.0, 0.45, True), tint=(0.86, 0.82, 0.70), seed=2.0)
 ceil = grimed(M["Ceiling_paint"], "nicotine", stain=(0.42, 0.30, 0.13), scale=0.9, amount=0.8, tint=(0.88, 0.80, 0.62), seed=3.0)
 carpet = grimed(M["Carpet_plain"], "stained", stain=(0.30, 0.23, 0.15), scale=1.8, amount=0.6, tint=(0.82, 0.78, 0.72), seed=4.0)
