@@ -588,6 +588,14 @@ spot_on("Neglect_bookcase_light", ((BR[0] + BR[1]) / 2, Y1 - 1.4, 2.2), ((BR[0] 
 # the garden photo behind the window instead of the plain modelled outside
 for o in list(sc.collection.objects):
     if o.name.startswith("Outside_") and o.type == "MESH": sc.collection.objects.unlink(o)
+# without the modelled outside, the sky's own sun disc (not lined up with the Sun lamp) shines in through the
+# window as a second patch: this scene gets a copy of the world with the disc off, so only the Sun lamp's patch falls
+wn = bpy.data.worlds.get("World_neglect")
+if not wn:
+    wn = sc.world.copy(); wn.name = "World_neglect"
+    for n in wn.node_tree.nodes:
+        if n.type == "TEX_SKY": n.sun_disc = False
+sc.world = wn
 gimg = bpy.data.images.load(os.path.join(ROOT, "labels", GARDEN), check_existing=True)
 gm = bpy.data.materials.get("Garden_photo_dull") or bpy.data.materials.new("Garden_photo_dull")
 gm.use_nodes = True; nt = gm.node_tree; nt.nodes.clear()
@@ -658,7 +666,7 @@ put("box_open", (1.65, HY + 0.3), z=0.34, rot_z=-0.25)
 put("magazines", (2.2, HY + 0.3), rot_z=0.2)
 
 # on the projected floor only flat things: the worn rug and post pushed under the door
-put("rug", (0.0, 0.0), rot_z=0.0, fit=(0, 3.6))
+put("rug", (0.0, 0.0), rot_z=math.radians(90), fit=(1, 3.6))   # model is long along its own Y: 3.6 x 2.3 m, long way across the room
 for i in range(3):
     put("letters", (0.9 + random.uniform(-0.3, 0.3), Y0 + 0.35 + random.uniform(0, 0.3)), rot_z=random.uniform(-1, 1), z=0.004 + i * 0.002, scale=0.8)
 
