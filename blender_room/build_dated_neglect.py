@@ -303,7 +303,7 @@ sy0, sy1 = (bounds(sink)[0].y, bounds(sink)[1].y) if sink else (kmx.y - 1.1, kmx
 WX = KX - 0.30                                    # a line along the worktop, clear of the wall cupboards
 # in and by the sink: dirty plates, the pile of washing-up on the drainer
 plate_with_cutlery((WX - 0.02, (sy0 + sy1) / 2), work_z, rot=0.2)
-place("dishes", (WX, sy0 - 0.32), work_z, rot_z=math.radians(-90))
+place("dishes", (KX - 0.22, sy0 - 0.34), work_z, rot_z=math.radians(-90))
 # along the rest of the worktop (south of the sink, towards the cooker): the tray from last night's dinner,
 # the takeaway, the teapot; north of the sink: empties and a mug
 place("tray_dirty", (WX - 0.02, kmn.y + 0.32), work_z, rot_z=math.radians(-80))
@@ -322,7 +322,7 @@ if smn_.y - KY0 >= bw + 0.02:
 else:
     binr.location += Vector((X1 + g["ARCH_T"] + 0.02 + bw / 2 - (bmn.x + bmx.x) / 2, KY0 + 0.01 + bw / 2 - (bmn.y + bmx.y) / 2, 0))
 bpy.context.view_layer.update()
-put("binbag_a", (X1 + 0.75, KY0 + 0.95), rot_z=0.7)
+put("binbag_a", (X1 + 0.45, KY0 + 0.72), rot_z=0.7)          # by the bin
 put("binbag_b", (X1 + 0.6, KY1 - 0.35), rot_z=-0.4)
 put("box_open", (KX - 1.0, KY1 - 0.3), rot_z=0.2)
 
