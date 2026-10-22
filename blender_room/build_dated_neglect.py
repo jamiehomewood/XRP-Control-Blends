@@ -213,12 +213,14 @@ KX = X1 + g["KITCHEN_D"]; KY0, KY1 = g["KITCHEN_Y"]
 
 def tree(root): return [root, *root.children_recursive]
 
-def recolour(root, name, rgb, tag):
-    """Multiply the colour of material `name` on this piece by rgb (an image-textured colour keeps its grain)."""
+def recolour(root, name, rgb, tag, match=None):
+    """Multiply the colour of material `name` on this piece by rgb (an image-textured colour keeps its grain).
+    match(mat) picks the material instead of the name (library loads can renumber names like Metal.005)."""
     for o in tree(root):
         if o.type != "MESH": continue
         for s in o.material_slots:
-            if not s.material or not s.material.name.startswith(name): continue
+            if not s.material: continue
+            if not (match(s.material) if match else s.material.name.split(".")[0] == name.split(".")[0] and s.material.name.startswith(name)): continue
             nm = f"{name}_{tag}"
             m = bpy.data.materials.get(nm)
             if not m:
@@ -237,14 +239,18 @@ kit = put("kitchen_pariz", (KX - 0.3, 0.725), rot_z=math.radians(-90), back=(0, 
 for o in list(tree(kit)):                         # no fresh fruit or new-looking bowls in this kitchen
     if o.type == "MESH" and any(s.material and s.material.name.split(".")[0] in ("apple", "wooden bowl") for s in o.material_slots):
         bpy.data.objects.remove(o, do_unlink=True)
-recolour(kit, "wood_drawers dark", (0.55, 0.30, 0.14), "oak80s")    # dark grey doors -> tired brown 'oak effect'
-recolour(kit, "wood_drawers light", (0.95, 0.85, 0.66), "cream")
-recolour(kit, "wood_cabinets", (0.92, 0.82, 0.62), "cream")
-recolour(kit, "wood_tabletop", (0.80, 0.68, 0.50), "stained")
+recolour(kit, "wood_drawers dark", (0.34, 0.19, 0.09), "oak80s")    # dark grey doors -> tired brown 'oak effect'
+recolour(kit, "wood_drawers light", (0.40, 0.24, 0.12), "oak80s")
+recolour(kit, "wood_cabinets", (0.36, 0.21, 0.10), "oak80s")
+recolour(kit, "wood_tabletop", (0.62, 0.55, 0.42), "stained")
 kmn, kmx = bounds(tree(kit))
-work_z = max(bounds([o])[1].z for o in tree(kit) if o.type == "MESH" and bounds([o])[1].z < 1.2)   # top of the worktop
+work_z = max(bounds([o])[1].z for o in tree(kit) if o.type == "MESH" and any(s.material and "tabletop" in s.material.name for s in o.material_slots))   # top of the worktop
 fr = put("fridge_retro", (KX - 0.38, KY1 - 0.38), rot_z=math.radians(-90), back=(0, KX - 0.02, +1))
-recolour(fr, "Metal.005", (0.80, 0.75, 0.62), "cream")              # a yellowed cream, not the shiny orange
+def _orange(m):
+    b = next((n for n in m.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None) if m.use_nodes else None
+    c = b.inputs["Base Color"].default_value if b else (0, 0, 0, 1)
+    return c[0] > 0.6 and c[2] < 0.2
+recolour(fr, "fridge_body", (0.78, 0.74, 0.62), "cream", match=_orange)   # a yellowed cream, not the shiny orange
 put("cooker", (KX - 0.3, kmn.y - 0.3), rot_z=math.radians(-90), back=(0, KX - 0.02, +1))
 
 # the worktop: dirty dishes by the sink, a takeaway bag, bottles, a mug
@@ -259,6 +265,29 @@ put("bin_full", (KX - 0.85, kmn.y + 0.2))
 put("binbag_a", (X1 + 0.55, KY0 + 0.35), rot_z=0.7)
 put("binbag_b", (X1 + 0.6, KY1 - 0.35), rot_z=-0.4)
 put("box_open", (KX - 1.0, KY1 - 0.3), rot_z=0.2)
+
+# the hall door: the shell's copy of the main room's door leaf comes out misplaced in this file, so build a
+# plain panelled door instead, swung open into the hall the same way (it never covers the real floor)
+for o in list(sc.objects):
+    if o.name.startswith("RC_Door"): bpy.data.objects.remove(o, do_unlink=True)
+DX, DW, DH, DOPEN = g["DOOR_X"], g["DOOR_W"], g["DOOR_H"], g["DOOR_OPEN"]
+hinge = Vector((DX - DW / 2, Y0 - 0.005, 0))
+drot = Matrix.Translation(hinge) @ Matrix.Rotation(DOPEN, 4, "Z") @ Matrix.Translation(-hinge)
+brass = bpy.data.materials.get("Neglect_brass") or bpy.data.materials.new("Neglect_brass")
+brass.use_nodes = True; _b = brass.node_tree.nodes["Principled BSDF"]
+_b.inputs["Base Color"].default_value = (0.45, 0.33, 0.14, 1); _b.inputs["Metallic"].default_value = 1.0; _b.inputs["Roughness"].default_value = 0.45
+def door_box(nm, size, loc, mat):
+    me = bpy.data.meshes.new(nm); import bmesh; bm = bmesh.new(); bmesh.ops.create_cube(bm, size=1.0); bm.to_mesh(me); bm.free()
+    me.materials.append(mat); o = bpy.data.objects.new(nm, me); coll.objects.link(o)
+    o.matrix_world = drot @ Matrix.LocRotScale(Vector(loc), None, Vector(size)); return o
+DY = Y0 - 0.025
+door_box("Neglect_door_slab", (DW - 0.006, 0.04, DH - 0.008), (DX, DY, DH / 2), gloss)
+for zc in (0.5, 1.42):
+    for xo in (-0.19, 0.19):
+        door_box(f"Neglect_door_panel_{zc}_{xo}", (0.30, 0.012, 0.70 if zc > 1 else 0.62), (DX + xo, DY + 0.024, zc), gloss)
+        door_box(f"Neglect_door_panelb_{zc}_{xo}", (0.30, 0.012, 0.70 if zc > 1 else 0.62), (DX + xo, DY - 0.024, zc), gloss)
+for sy in (+1, -1):
+    door_box(f"Neglect_door_knob_{sy}", (0.06, 0.05, 0.06), (DX + DW / 2 - 0.07, DY + sy * 0.045, 1.0), brass)
 
 # hall beyond the door: rubbish bags and boxes waiting to go out (they never did)
 HY = Y0 - g["WALL_T"] - g["HALL_W"]           # far wall of the hall
