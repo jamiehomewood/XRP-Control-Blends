@@ -18,6 +18,8 @@ Students talk to her through Yes/No answers on their own phones; every answer is
 2. Run the scene: double-click `spout-test/start-server.bat` (needs Python), then see `spout-test/README.md`.
 3. Only needed to rebuild the room in Blender: `python blender_room/fetch_blender_assets.py` downloads the Poly Haven CC0 models and textures.
 
+**Dated room – neglected** (`spout-test/dated_neglect.html`, built by `blender_room/build_dated_neglect.py`): the dated room furnished with free BlenderKit models and dressed for a safeguarding visit – damp, stains, clutter, a neglected fitted kitchen, dirty plates, drink, smoking, tablets left out, drug paraphernalia (foil, spoon, syringes – one on the floor as a sharps risk) and a grandchild's crayon drawings and fridge magnets. The BlenderKit models are kept in a local library (`blender_room/assets_local/`, not in git: their licence doesn't allow redistributing the model files), so rebuilding needs BlenderKit and the same free models; the rendered panorama is in the repo.
+
 Not in the repo: the MakeHuman asset packs, test renders, old asset versions and `spout-test/sessions/` (answer logs contain student names).
 
 ## Credits

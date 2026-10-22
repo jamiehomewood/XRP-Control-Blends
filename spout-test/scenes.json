@@ -5,5 +5,6 @@
   {"id": "modern", "label": "Empty room – modern", "url": "modern_room.html"},
   {"id": "modern_furnished", "label": "Modern – furnished", "url": "modern_furnished.html"},
   {"id": "modern_glenda", "label": "Modern – Glenda's things", "url": "modern_glenda.html"},
+  {"id": "dated_neglect", "label": "Dated room – neglected", "url": "dated_neglect.html"},
   {"id": "blank", "label": "Blank (black)", "url": "about:blank"}
 ]
