@@ -132,27 +132,3 @@ room is `room_pano_modern_glenda.jpg` and Glenda is `glenda_seated.glb`, sitting
 - the cube faces rendered live are worked out from her size once she loads
 
 Source: `Characters/Glenda_seated.blend` (the original `Glenda_editable.blend` is untouched).
-
-
-## Dementia triggers (`dementia.html`)
-
-Remote scenes "Modern – dementia triggers", "… dusk falls (sundowning)" and "… (no sound)". Switch from "Modern – Glenda's
-things" to show the same room as it can be experienced with dementia. Nothing was re-rendered: the effects are drawn live
-on top of `room_pano_modern_glenda.jpg` in a shader, placed from the room's real geometry.
-
-| Trigger | What happens | Brief point |
-|---|---|---|
-| Kitchen wall tiles | Splashback tiles in muted colours that shift, swim and change | Complex patterns → dizziness |
-| Kitchen floor | Tiles look glossy and wet, with rippling reflections of the units and lights | Glossy floors → look wet, fear of walking |
-| Rug / hole | Every 45 s the rug darkens, drops away into a pit, stays a hole for ~20 s, then comes back | Dark rugs → perceived holes |
-| Dark corner | A dark doorway with stairs climbing into blackness, in a pool of shadow (south-east corner) | Dark zones / shadows |
-| Flicker | Every 4–12 s the room dips and the downlights/lamp cut out briefly; kept under 3 changes a second | Lighting quality |
-| Night | Dark outside, blinds lit from inside, room dimmer and warmer, no sun patch. `night=dusk` fades from day over 90 s | Sundowning |
-| Sound | A mistuned radio plus a group talking over each other, levels drifting (`audio/dementia_*.mp3`, ElevenLabs SFX) | Acoustic overload |
-
-URL options: `tiles=0` `hole=0|dark|pit|sink` `stairs=0` `flicker=0` `night=0|1|dusk` `audio=0` `vol=0.8` `hud=1`.
-Keyboard (OBS Interact or a keyboard on the room PC): 1 tiles, 2 hole, 3 stairs, 4 flicker, 5 night, 6 sound, H status; each fades in or out.
-If the sound doesn't start in a plain browser, click the page once (it starts on its own in the Igloo web layer).
-
-Facilitator note: flicker and moving patterns can affect people with photosensitive epilepsy or motion sensitivity –
-mention it before starting, or use the URL options to turn those off.

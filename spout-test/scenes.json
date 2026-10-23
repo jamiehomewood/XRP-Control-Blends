@@ -5,9 +5,6 @@
   {"id": "modern", "label": "Empty room – modern", "url": "modern_room.html"},
   {"id": "modern_furnished", "label": "Modern – furnished", "url": "modern_furnished.html"},
   {"id": "modern_glenda", "label": "Modern – Glenda's things", "url": "modern_glenda.html"},
-  {"id": "dementia", "label": "Modern – dementia triggers", "url": "dementia.html"},
-  {"id": "dementia_dusk", "label": "Modern – dementia: dusk falls (sundowning)", "url": "dementia.html?night=dusk"},
-  {"id": "dementia_quiet", "label": "Modern – dementia triggers (no sound)", "url": "dementia.html?audio=0"},
   {"id": "dated_neglect", "label": "Dated room – neglected", "url": "dated_neglect.html"},
   {"id": "blank", "label": "Blank (black)", "url": "about:blank"}
 ]
