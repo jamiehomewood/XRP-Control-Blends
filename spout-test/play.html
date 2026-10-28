@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Room tablet</title>
+<style>
+  :root { --bg: #12151a; --card: #1e232b; --card2: #2a313b; --text: #eef1f5; --muted: #9aa4b2; --acc: #e8a33d; --good: #2f9e5b; --bad: #c2423b; --item: #f3d36b; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font: 17px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 14px 14px 40px; display: flex; flex-direction: column; gap: 14px; }
+  header { display: flex; align-items: baseline; gap: 10px; }
+  header h1 { font-size: 20px; margin: 0; flex: 1; }
+  #conn { font-size: 13px; color: var(--muted); } #conn.ok::before { content: "● "; color: var(--good); } #conn.bad::before { content: "● "; color: var(--bad); }
+  .grp { background: var(--card); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .grp > .lab { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .txt b { display: block; font-size: 20px; } .txt p { margin: 4px 0 0; white-space: pre-wrap; color: #d9dee6; }
+  .txt.good { border-left: 4px solid var(--good); padding-left: 10px; } .txt.bad { border-left: 4px solid var(--bad); padding-left: 10px; }
+  button { font: 600 17px system-ui, sans-serif; color: var(--text); background: var(--card2); border: 0; border-radius: 14px; padding: 14px 16px; cursor: pointer; }
+  button:active { transform: scale(.98); }
+  .act { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; min-height: 58px; }
+  .act span { flex: 1; } .act em { font-style: normal; font-size: 14px; color: #14171c; background: var(--acc); border-radius: 10px; padding: 6px 12px; }
+  .act img { width: 44px; height: 44px; object-fit: contain; border-radius: 8px; background: #11151a; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .bag { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
+  .bag button { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 8px; font-size: 14px; border: 2px solid transparent; }
+  .bag button.on { border-color: var(--item); background: #2f2a1d; }
+  .bag img, .bag .ph { width: 76px; height: 76px; object-fit: contain; border-radius: 10px; background: #11151a; }
+  .bag .ph { display: flex; align-items: center; justify-content: center; font-size: 34px; color: var(--item); }
+  .pad { position: relative; height: 260px; border-radius: 14px; background: radial-gradient(circle at 50% 45%, #2e3540, #171b21); touch-action: none; display: flex; align-items: center; justify-content: center; color: var(--muted); text-align: center; user-select: none; }
+  .pad::after { content: ""; position: absolute; inset: 10px; border: 2px dashed #3a4350; border-radius: 10px; pointer-events: none; }
+  .pad .hint { font-size: 15px; padding: 0 30px; }
+  .zoom { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .pwrap { overflow-x: auto; border-radius: 12px; background: #000; }
+  .pin { position: relative; overflow: hidden; }
+  .pin img { display: block; width: 100%; aspect-ratio: 2 / 1; -webkit-user-select: none; user-select: none; }
+  .pm, .tap { position: absolute; transform: translate(-50%, -50%); pointer-events: none; }
+  .pm i { display: block; width: 20px; height: 20px; border-radius: 50%; border: 3px solid #4fd18b; background: rgba(0,0,0,.45); }
+  .pm.k-lock i { border-color: #e0605a; } .pm.k-info i { border-color: #5aa2e0; } .pm.k-question i { border-color: #e8a33d; } .pm.k-item i { border-color: #f3d36b; } .pm.k-use i { border-color: #c58cf0; }
+  .pm em { position: absolute; top: 22px; left: 50%; transform: translateX(-50%); font: 600 12px system-ui; font-style: normal; white-space: nowrap; text-shadow: 0 1px 3px #000, 0 0 2px #000; }
+  .tap { width: 36px; height: 36px; border-radius: 50%; border: 2px solid #fff; animation: tap .6s ease-out forwards; }
+  @keyframes tap { from { opacity: 1; transform: translate(-50%, -50%) scale(.4); } to { opacity: 0; transform: translate(-50%, -50%) scale(1.4); } }
+  .code { display: flex; gap: 10px; } .code input { flex: 1; min-width: 0; font: 600 24px ui-monospace, Consolas, monospace; letter-spacing: .15em; padding: 10px 12px; border-radius: 12px; border: 1px solid #3a4350; background: #11151a; color: var(--text); }
+  .code button { background: var(--good); }
+  .note { color: var(--muted); }
+  .phead { display: flex; align-items: center; gap: 10px; } .phead span { flex: 1; color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<!-- Student tablet for tours (and any scene that reports student controls through remote.js): the bag, looking at and
+     turning what you hold, reading, giving things to people, answering, and tapping the room. Facilitator-only controls
+     (staff: true) stay on control.html.  Open http://<room PC>:8000/play.html on the room tablet. -->
+<main>
+  <header><h1 id="title">Room tablet</h1><span id="conn" class="bad">connecting…</span></header>
+  <div id="panel"><div class="grp note">Waiting for the room…</div></div>
+</main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const post = (id, body) => fetch('/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, ...body, name: 'student tablet' }) }).catch(() => {});
+  const nonce = () => Date.now() + Math.random();
+  let sig = null, defs = {}, zoomed = {};
+  const turn = { s: null, rx: 0, ry: 0, zoom: 1, sendT: 0 };
+
+  function sigOf(cs) { return JSON.stringify(cs.map((c) => c.type === 'turn' ? { ...c, rx: 0, ry: 0, zoom: 0 } : c)); }
+  function ctl(c) {
+    if (c.type === 'text') return `<div class="txt ${esc(c.tone || '')}"><b>${esc(c.label)}</b>${c.hint ? `<p>${esc(c.hint)}</p>` : ''}</div>`;
+    if (c.type === 'button') return `<button class="act" data-press="${esc(c.id)}">${c.thumb ? `<img src="${esc(c.thumb)}" alt="">` : ''}<span>${esc(c.label || '')}${c.hint ? `<br><small class="note">${esc(c.hint)}</small>` : ''}</span><em>${esc(c.action || 'Go')}</em></button>`;
+    if (c.type === 'inventory') return `<div class="bag">${(c.items || []).map((it) => `<button data-bag="${esc(it.id)}" class="${it.id === c.selected ? 'on' : ''}">${it.thumb ? `<img src="${esc(it.thumb)}" alt="">` : '<span class="ph">★</span>'}${esc(it.name)}</button>`).join('')}</div>`;
+    if (c.type === 'turn') return `<div class="pad" data-turn="${esc(c.id)}"><span class="hint">${esc(c.label || 'Drag to turn it')}<br><small>Up and down tilts it</small></span></div>
+      <div class="zoom"><button data-zoom="-1">Smaller</button><button data-zoom="0">Reset</button><button data-zoom="1">Bigger</button></div>`;
+    if (c.type === 'code') return `<form class="code" data-code="${esc(c.id)}"><input autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="24" placeholder="${esc(c.label || 'Code')}"><button>Try</button></form>`;
+    if (c.type === 'pano') return `<div class="phead"><span>${esc(c.label || 'Tap the room')}</span><button data-pz="${esc(c.id)}">${zoomed[c.id] ? 'Whole room' : 'Zoom in'}</button></div>
+      <div class="pwrap" data-pano="${esc(c.id)}"><div class="pin" style="width:${zoomed[c.id] ? 300 : 100}%"><img src="${esc(c.src || '')}" alt="The room: tap a spot" draggable="false">` +
+      (c.markers || []).map((m) => `<span class="pm k-${esc(m.kind || 'go')}" style="left:${((+m.yaw || 0) / 360 + 0.5) * 100}%;top:${(0.5 - (+m.pitch || 0) / 180) * 100}%"><i></i>${m.label ? `<em>${esc(m.label)}</em>` : ''}</span>`).join('') + '</div></div>';
+    return '';
+  }
+  function draw(p) {
+    const cs = ((p && p.controls) || []).filter((c) => !c.staff && ['text', 'button', 'inventory', 'turn', 'code', 'pano'].includes(c.type));
+    const s = (p ? p.page : '') + sigOf(cs); if (s === sig) return; sig = s;
+    defs = Object.fromEntries(cs.map((c) => [c.id, c]));
+    const t = cs.find((c) => c.type === 'turn');
+    if (t && t.session !== turn.s) Object.assign(turn, { s: t.session, rx: +t.rx || 0, ry: +t.ry || 0, zoom: +t.zoom || 1 });
+    const keep = {}, typed = {};
+    document.querySelectorAll('.pwrap').forEach((w) => { keep[w.dataset.pano] = w.scrollLeft; });
+    document.querySelectorAll('[data-code]').forEach((f) => { typed[f.dataset.code] = f.querySelector('input').value; });
+    const groups = new Map();
+    for (const c of cs) { const g = c.group || ''; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(c); }
+    $('panel').innerHTML = !cs.length ? '<div class="grp note">Nothing to do on the tablet in this scene.</div>'
+      : [...groups].map(([g, list], i) => `<section class="grp">${g && i ? `<div class="lab">${esc(g)}</div>` : ''}${list.map(ctl).join('')}</section>`).join('');
+    document.querySelectorAll('.pwrap').forEach((w) => { if (keep[w.dataset.pano]) w.scrollLeft = keep[w.dataset.pano]; });
+    document.querySelectorAll('[data-code]').forEach((f) => { f.querySelector('input').value = typed[f.dataset.code] || ''; });
+  }
+
+  // turning what you hold: drag on the pad (absolute angles, sent a few times a second)
+  function sendTurn(now) {
+    const go = () => post('turn', { value: { rx: turn.rx, ry: turn.ry, zoom: turn.zoom, s: turn.s } });
+    // throttle, not debounce: while you drag it sends about 14 times a second (the old 90 ms debounce only sent when your
+    // finger paused, so the object jumped). The room glides between updates.
+    if (now) { clearTimeout(turn.sendT); turn.sendT = 0; turn.last = performance.now(); go(); return; }
+    if (turn.sendT) return;
+    const wait = Math.max(0, 70 - (performance.now() - (turn.last || 0)));
+    turn.sendT = setTimeout(() => { turn.sendT = 0; turn.last = performance.now(); go(); }, wait);
+  }
+  let drag = null;
+  document.addEventListener('pointerdown', (e) => {
+    const pad = e.target.closest('[data-turn]'); if (!pad) return;
+    drag = { x: e.clientX, y: e.clientY, rx: turn.rx, ry: turn.ry, live: false }; pad.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  document.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    let dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (!drag.live) { if (Math.hypot(dx, dy) < 8) return; drag.live = true; drag.x = e.clientX; drag.y = e.clientY; dx = dy = 0; }   // a small dead zone: a touch doesn't nudge it
+    turn.ry = drag.ry + dx * 0.35; turn.rx = Math.max(-85, Math.min(85, drag.rx + dy * 0.3));   // gentler: about a third of a turn across the pad
+    sendTurn(false);
+  });
+  document.addEventListener('pointerup', () => { if (drag) { const moved = drag.live; drag = null; clearTimeout(turn.sendT); turn.sendT = 0; if (moved) sendTurn(true); } });
+  document.addEventListener('pointercancel', () => { if (drag) { drag = null; clearTimeout(turn.sendT); turn.sendT = 0; sendTurn(true); } });
+
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-press]'); if (b) { post(b.dataset.press, { press: true }); b.style.opacity = .5; setTimeout(() => { b.style.opacity = ''; }, 400); return; }
+    const bag = e.target.closest('[data-bag]');
+    if (bag) { document.querySelectorAll('[data-bag]').forEach((x) => x.classList.toggle('on', x === bag)); post('bag', { value: { v: bag.dataset.bag, n: nonce() } }); return; }
+    const z = e.target.closest('[data-zoom]');
+    if (z) { const d = +z.dataset.zoom; if (!d) { turn.rx = 0; turn.ry = 0; turn.zoom = 1; } else turn.zoom = Math.max(0.4, Math.min(2.5, turn.zoom * (d > 0 ? 1.25 : 0.8))); sendTurn(true); return; }
+    const pz = e.target.closest('[data-pz]');
+    if (pz) { const id = pz.dataset.pz; zoomed[id] = !zoomed[id]; const w = document.querySelector(`.pwrap[data-pano="${CSS.escape(id)}"]`);
+      if (w) { const mid = (w.scrollLeft + w.clientWidth / 2) / w.scrollWidth; w.firstElementChild.style.width = (zoomed[id] ? 300 : 100) + '%'; w.scrollLeft = mid * w.scrollWidth - w.clientWidth / 2; }
+      pz.textContent = zoomed[id] ? 'Whole room' : 'Zoom in'; return; }
+    const im = e.target.closest('.pin img');
+    if (im) {
+      const r = im.getBoundingClientRect(), u = (e.clientX - r.left) / r.width, v = (e.clientY - r.top) / r.height;
+      const dot = document.createElement('span'); dot.className = 'tap'; dot.style.left = u * 100 + '%'; dot.style.top = v * 100 + '%';
+      im.parentNode.append(dot); setTimeout(() => dot.remove(), 700);
+      post(im.closest('[data-pano]').dataset.pano, { value: { yaw: (u - 0.5) * 360, pitch: (0.5 - v) * 180, n: nonce() } });
+    }
+  });
+  document.addEventListener('submit', (e) => {
+    const f = e.target.closest('[data-code]'); if (!f) return; e.preventDefault();
+    const i = f.querySelector('input'), v = i.value.trim(); if (!v) return;
+    post(f.dataset.code, { value: { v, n: nonce() } }); i.value = '';
+  });
+
+  async function poll() {
+    try {
+      const s = await (await fetch('/api/state', { cache: 'no-store' })).json();
+      const st = s.stage || {};
+      $('title').textContent = (s.panel && s.panel.title) || st.label || 'Room tablet';
+      $('conn').textContent = st.connected ? 'room connected' : 'room page not open'; $('conn').className = st.connected || s.panel ? 'ok' : 'bad';
+      if (!drag) draw(s.panel);
+    } catch (e) { $('conn').textContent = 'server not reachable'; $('conn').className = 'bad'; }
+    setTimeout(poll, 400);
+  }
+  poll();
+</script>
+</body>
+</html>

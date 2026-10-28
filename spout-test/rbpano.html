@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Room Builder room</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  /* the panorama IS the 360 output: stretch it to fill the layer (use a 2:1 layer, e.g. 6144 x 3072 or 4096 x 2048) */
+  img { display: block; width: 100vw; height: 100vh; }
+  #msg { position: absolute; left: 12px; bottom: 10px; font: 16px system-ui, sans-serif; color: #888; }
+</style>
+</head>
+<body>
+<!-- Shows one finished render from the Room Builder library: rbpano.html?lib=<library id>&view=<view>.
+     server.py serves the image straight from the library folder (/rb/<id>/view_<view>.jpg), and lists every library room
+     on the remote automatically. -->
+<img id="pano" alt="">
+<div id="msg"></div>
+<script>
+  const q = new URLSearchParams(location.search);
+  const lib = q.get('lib') || '', view = q.get('view') || 'centre';
+  const img = document.getElementById('pano');
+  if (!/^[\w-]+$/.test(lib) || !/^[\w-]+$/.test(view)) document.getElementById('msg').textContent = 'No room chosen';
+  else {
+    img.onerror = () => { document.getElementById('msg').textContent = 'Could not load ' + lib + ' (' + view + ') from the Room Builder library'; };
+    img.src = '/rb/' + lib + '/view_' + view + '.jpg';
+  }
+</script>
+</body>
+</html>

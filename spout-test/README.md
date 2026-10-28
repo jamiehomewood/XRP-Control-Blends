@@ -1,134 +1,50 @@
-# Glenda's living room – 360 scene for the Igloo room
+# Spouty
 
-## Running it
+Replaces OBS + Browser source + Spout plugin. It loads the scene page offscreen at a fixed size
+and sends every frame out over Spout, so IglooPreview (or the room) can pick it up.
 
-1. Double-click **start-server.bat** and leave its window open. It needs Python (python.org; tick "Add python.exe to PATH" when installing). The window prints the address for the remote control.
-2. Set up an OBS **Browser** source:
-   - URL: `http://localhost:8000/index.html`
-   - size 4096 × 2048 (OBS Settings → Video should match)
-   - tick "Control audio via OBS" if you want her voice to go through OBS; leave it unticked to play through the PC's speakers
-3. Go to **Tools → Spout Output Settings** and start sending as `GlendaScene`, then select that sender in IglooPreview or the room.
+## Use
 
-### One-click start and stop (OBS + Spout route)
+1. Start the scene server as usual (`start-server.bat`).
+2. Run `Spouty.exe`. It starts sending straight away as **spoutyfeed**.
+3. In IglooPreview, select the `spoutyfeed` sender.
 
-- **`start-room.bat`** starts the scene server (if it isn't already running) and OBS, minimised. `start-room.bat modern` also picks the first scene. Add it to an Igloo Core Engine layer to launch everything from there.
-- **`stop-room.bat`** closes OBS (forcing it after 10 s if it hangs) and stops the scene server.
+Close the small window to stop.
 
-One-time OBS setup on that PC:
-1. The Browser source URL is `http://localhost:8000/stage.html`, so the remote's scene buttons control what OBS sends. The size is 4096 × 2048.
-2. Go to **Tools → Spout Output Settings**, set the sender name, and tick **AutoStart** so OBS sends over Spout as soon as it opens.
-3. If OBS isn't in `C:\Program Files\obs-studio`, edit `OBS_DIR` at the top of `start-room.bat`.
+## The window
 
-### Switching scenes from the remote (Igloo Core Engine)
-
-Load **`http://localhost:8000/stage.html`** in the Igloo web layer (4096 × 2048, Dynamic Resolution off) instead of a particular scene. On the remote, open **Facilitator controls → Scene in the room** and tap a scene; the room fades over to it within a second. The current scene is shown under the title on every phone.
-
-The scene list is `scenes.json` (id, label, url). Add a line to add a scene; no restart needed:
-
-```json
-{ "id": "modern", "label": "Empty room – modern", "url": "modern_room.html" }
-```
-
-`stage.html?scene=modern` starts the room on a particular scene.
-
-### Talking to her (Yes / No branching)
-
-**Remote control (recommended):** everyone in the room can use their own phone. On the same Wi-Fi, open the address the server window prints, e.g. `http://192.168.1.20:8000/control.html` (on the PC itself: `http://localhost:8000/control.html`).
-
-- Each person enters their name once (the phone remembers it; tap **change** to switch).
-- **In the room** lists everyone connected.
-- When she asks a question, it appears on every phone and the **Yes** / **No** buttons light up. The first answer counts, and every phone shows who gave it ("Sam answered Yes to…"), plus the list of answers for this visit.
-- **Facilitator controls** (tap to open): **Start**, **Replay**, **New take**, **Stop**.
-- Under the title: the scene's frame rate (green 50+, amber 30–49, red below 30).
-
-Every answer is saved to `sessions/answers_<date>.csv` (opens in Excel) with the time, the visit's start time, the person's name, the question and their answer. Answers given with the keyboard are logged as "Keyboard".
-
-If Windows asks whether to allow Python on the network, allow it on Private networks, or the phone can't reach it.
-
-**Keyboard:** right-click the source in OBS → **Interact**, click inside once, then:
-
-| Key | Action |
+| OBS / plugin setting | Here |
 |---|---|
-| Space / Enter | Start |
-| Y / N | Answer Yes / No |
-| R | Replay her last line |
-| T | Different take of the same line |
-| S | Stop |
-| H | Show or hide the status display |
+| Browser source URL | **Page URL** (default `http://localhost:8000/stage.html`), then **Load** or Enter |
+| Browser source size | **Width / Height** (default 4096 x 2048) |
+| Spout sender name | **Spout sender name** (default `spoutyfeed`) |
+| Spout AutoStart | Always on |
+| Control audio via OBS | **Audio output** - pick the speakers; **Mute** |
+| Right-click > Interact, then keys | Buttons, or press Space / Y / N / R / T / S / H with this window in front |
+| Refresh cache of current page | **Load** (with the URL unchanged, it reloads the page) |
 
-The placeholder conversation: greeting → offers tea (Y/N) → asks if you've come about her legs (Y/N) → asks if you want to see her tablets (Y/N) → closing line. Each answer has its own reply, with cues from the brief (leaking legs, skipped water tablets, "heartburn" when walking).
+Settings save to `config.json` next to the exe. You can also pass them on the command line, e.g.
+`Spouty.exe --url=http://localhost:8000/index.html?hud=1 --senderName=Test`
+(command-line values apply to that run only).
 
-## How it's built
+The box turns orange while a typed URL hasn't been loaded yet. **Showing:** under it is the page actually being sent.
+You can leave out `http://` (`localhost:8000/index.html` works). Editing `config.json` while Spouty is running
+also takes effect within a second.
 
-| Part | File | Made in |
-|---|---|---|
-| The room | `assets/room_pano.jpg` | Blender Cycles, rendered as a 6144 × 3072 360 image from the viewer's position. Glenda is invisible in this render, but her shadow is baked in. |
-| Glenda | `assets/glenda.glb` | MPFB in Blender: rigged and seated. Her clothes are baked into the seated shape. |
-| Occluders | `assets/room_proxies.glb` | Invisible copies of the chair, stick, side table and lamp, so they appear in front of her correctly |
-| Her lines | `dialogue.json` + `audio/` | ElevenLabs (voice "Beatrice"), four takes per line |
+If the scene server isn't running yet, it keeps retrying every 3 seconds.
+Still pages are re-sent a few times a second, so a receiver always has the current image.
 
-The live page draws the room panorama and renders Glenda on top every frame. She:
-- plays Mixamo clips: seated idle, talking gestures while she speaks, and an occasional arm rub
-- blinks every few seconds
-- opens her jaw in time with the loudness of the audio while she talks
+## Frame rate
 
-The virtual room is the physical room's size (6.40 × 5.71 m, 2.24 m walls), with the camera in the middle at 1.12 m (half the wall height), which is where the Igloo software puts the viewer when it maps a 360 image onto the walls and floor.
+The default sends frames through system memory (like OBS does). If the fps readout is low at 4096 x 2048,
+tick **Advanced > GPU zero-copy mode**, which hands the GPU texture straight to Spout.
 
-### Changing the room
+## Building
 
-1. Open `blender_room/Glenda_Room.blend`. The layout comes from `blender_room/build_room.py`; re-running the script rebuilds the room and leaves Glenda alone.
-2. Re-render with the **Cam360** camera, with Glenda's objects set to Visibility → Camera off.
-3. Save the render over `spout-test/assets/room_pano.jpg`.
+Needs Node.js. `npm install`, then `npm start` to run, or `npm run package` to make the Windows build
+in `dist/`. Copy `msvcp140.dll`, `vcruntime140.dll` and `vcruntime140_1.dll` next to the exe
+(or install the Microsoft Visual C++ 2015-2022 x64 runtime).
 
-### Changing the dialogue
-
-Everything she says is in `dialogue.json`. Each node is one line:
-
-```json
-"tea": {
-  "label": "Offers tea",
-  "text": "Would you like a cup of tea, love?",
-  "ask": "Would you like a cup of tea?",
-  "audio": ["audio/G_tea_take1.mp3", "audio/G_tea_take2.mp3"],
-  "yes": "tea_yes",
-  "no": "tea_no"
-}
-```
-
-- `yes` / `no`: she waits for an answer, then plays that node. `ask` is the text shown on the remote.
-- `next`: she carries straight on to that node after a short pause. `null` ends the conversation.
-- `audio`: one or more takes (MP3 or WAV); one is picked at random each time.
-- `"start"` at the top of the file names the first node.
-
-Save the file and refresh the OBS source; no restart needed.
-
-## URL options
-
-| Option | What it does |
-|---|---|
-| `hud=1` | Status display |
-| `exposure=1.2` | Brightens Glenda only (the room is fixed in the render) |
-| `cube=768` | Lowers Glenda's render resolution if the frame rate is low (default 1024) |
-| `eye=1.0` … `eye=1.75` | Viewer height in metres: 1.0, 1.12 (default), 1.3, 1.45, 1.6, 1.75. Pick the one where the virtual skirting lands on the real wall–floor line. Uses `assets/room_pano_eye145.jpg` etc. |
-| `yaw=90`, `flip=1` | Rotates or mirrors the whole output to suit the room |
-| `mode=cylinder&vfov=70` | Cylindrical strip output |
-| `say=hello&delay=3` | Plays a dialogue node automatically after loading |
-| `persp=1`, `persp=face` | Close-up camera on Glenda, for checking her (not for the room) |
-| `jawtest=1`, `blinktest=1` | Hold the jaw open or the eyes closed (rig checks) |
-
-`index_live_threejs_room.html` is the earlier all-three.js version of the room, kept for reference.
-
-
-## Glenda in the modern flat (`index.html?room=modern`)
-
-Remote scene "Glenda – home visit (modern flat)". Same dialogue, remote and audio as the original scene, but the
-room is `room_pano_modern_glenda.jpg` and Glenda is `glenda_seated.glb`, sitting on her sofa in the alcove:
-
-- trousers and a long-sleeved knit top (one piece of clothing, fitted by MPFB, body removed underneath) - no more
-  hands or skin poking through the clothes
-- Idle and Talking clips layered onto a fixed seated pose: legs stay put, the upper body and head move, and her hands
-  are pinned to her thighs on every frame (`Characters/scripts/glenda_contact.py`)
-- 6.9 MB instead of 21 MB
-- the cube faces rendered live are worked out from her size once she loads
-
-Source: `Characters/Glenda_seated.blend` (the original `Glenda_editable.blend` is untouched).
+Spout comes from `native/electron-spout.node`, a prebuilt copy of
+[electron-spout](https://github.com/fusefactory/electron-spout) (MIT) for Electron 38.8.0 x64,
+built on [Spout2](https://spout.zeal.co/) (BSD). If you change the Electron version, rebuild that addon from source.

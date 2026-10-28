@@ -39,9 +39,75 @@
   ol li span { color: var(--text); }
   details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
   footer { font-size: 12px; color: var(--muted); }
-  .scenes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .scenes button { background: var(--neutral); font-size: 15px; padding: 14px 6px; }
-  .scenes button.current { background: var(--accent); color: #14171c; }
+  /* facilitator: now showing + reset */
+  .now { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: #2a303a; }
+  .now .what { flex: 1; min-width: 0; }
+  .now .what b { display: block; font-size: 17px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .now .what small { color: var(--muted); font-size: 12px; }
+  #reset { background: var(--neutral); font-size: 15px; padding: 12px 14px; white-space: nowrap; }
+  #reset.arm { background: var(--no); }
+  /* scene controls panel (built from what the live scene says it can do) */
+  #panel .grp { margin-top: 12px; }
+  .ctl { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid #2c323c; min-height: 52px; }
+  .ctl:last-child { border-bottom: 0; }
+  .ctl .name { font-size: 15px; } .ctl .name small { display: block; color: var(--muted); font-size: 12px; }
+  .ctl .key { color: var(--muted); font: 12px ui-monospace, Consolas, monospace; margin-left: 6px; }
+  .sw { position: relative; width: 62px; height: 36px; flex: none; border-radius: 999px; padding: 0; background: var(--neutral); }
+  .sw::after { content: ""; position: absolute; top: 4px; left: 4px; width: 28px; height: 28px; border-radius: 50%; background: #cfd5de; transition: left .15s; }
+  .sw[aria-checked="true"] { background: var(--yes); } .sw[aria-checked="true"]::after { left: 30px; background: #fff; }
+  .sl { display: flex; align-items: center; gap: 10px; flex: 0 1 220px; }
+  .sl input { flex: 1; min-width: 90px; height: 32px; accent-color: var(--accent); }
+  .sl output { width: 3.2em; text-align: right; font: 13px ui-monospace, Consolas, monospace; color: var(--muted); }
+  .seg { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+  .seg button, .ctl > button.act { background: var(--neutral); font-size: 14px; padding: 10px 12px; border-radius: 10px; }
+  .seg button.on { background: var(--accent); color: #14171c; }
+  .ctl.sel { flex-wrap: wrap; }
+  .segi { display: flex; flex-wrap: wrap; gap: 6px; flex: 1 1 100%; } .segi button { background: var(--neutral); font-size: 14px; padding: 10px 12px; border-radius: 10px; }
+  .segi button.on { background: var(--accent); color: #14171c; } .ctl.sel .seg { flex: 1 1 100%; justify-content: flex-start; }
+  .note { color: var(--muted); font-size: 14px; padding: 8px 0; }
+  /* text / code / tap-the-picture controls (tours) */
+  .ctl.txt { display: block; } .ctl.txt b { font-size: 16px; } .ctl.txt small { display: block; margin-top: 4px; white-space: pre-wrap; font-size: 15px; color: #d5dbe3; }
+  .codef { display: flex; gap: 6px; flex: 0 1 260px; }
+  .codef input { flex: 1; min-width: 0; font: 600 20px ui-monospace, Consolas, monospace; letter-spacing: .1em; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--neutral); background: #171b21; color: var(--text); }
+  .codef button { background: var(--yes); font-size: 15px; padding: 10px 14px; border-radius: 10px; }
+  .ctl.pano { flex-wrap: wrap; } .ctl.pano .name { flex: 1; }
+  .pwrap { flex: 1 1 100%; overflow-x: auto; border-radius: 10px; background: #111; -webkit-overflow-scrolling: touch; }
+  .pin { position: relative; overflow: hidden; }
+  .pin img { display: block; width: 100%; aspect-ratio: 2 / 1; object-fit: fill; cursor: crosshair; -webkit-user-select: none; user-select: none; }
+  .pm, .tap { position: absolute; transform: translate(-50%, -50%); pointer-events: none; }
+  .pm i { display: block; width: 18px; height: 18px; border-radius: 50%; border: 3px solid #4fd18b; background: rgba(0, 0, 0, .45); }
+  .pm.k-lock i { border-color: #e0605a; } .pm.k-info i { border-color: #5aa2e0; } .pm.k-question i { border-color: #e8a33d; } .pm.k-item i { border-color: #f3d36b; }
+  .pm em { position: absolute; top: 21px; left: 50%; transform: translateX(-50%); font: 600 11px system-ui, sans-serif; font-style: normal; white-space: nowrap; color: #fff; text-shadow: 0 1px 3px #000, 0 0 2px #000; }
+  .tap { width: 34px; height: 34px; border-radius: 50%; border: 2px solid #fff; animation: tap .6s ease-out forwards; }
+  @keyframes tap { from { opacity: 1; transform: translate(-50%, -50%) scale(.4); } to { opacity: 0; transform: translate(-50%, -50%) scale(1.4); } }
+  /* scene picker */
+  .pickbar { display: flex; gap: 8px; margin-top: 6px; }
+  .pickbar input { flex: 1; min-width: 0; font: 16px system-ui, sans-serif; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--neutral); background: #171b21; color: var(--text); }
+  .pickbar button { background: var(--neutral); font-size: 14px; padding: 10px 12px; border-radius: 10px; }
+  .pickbar button.on { background: var(--accent); color: #14171c; }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .tag { background: #2a303a; color: var(--text); border-radius: 999px; padding: 6px 12px; font: 14px system-ui, sans-serif; border: 1px solid #39414e; }
+  .tag.on { background: var(--accent); color: #14171c; border-color: var(--accent); }
+  .tag.clear { background: transparent; color: var(--muted); }
+  .sgroup { margin-top: 10px; }
+  .sgroup > summary { list-style: none; display: flex; gap: 6px; padding: 8px 2px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .sgroup > summary::-webkit-details-marker { display: none; }
+  .sgroup > summary::before { content: "▸ "; } .sgroup[open] > summary::before { content: "▾ "; }
+  .scene { display: block; width: 100%; text-align: left; background: #2a303a; border-radius: 12px; padding: 12px 14px; margin-top: 6px; font: 600 16px system-ui, sans-serif; color: var(--text); }
+  .scene.current { background: var(--accent); color: #14171c; }
+  .scene .stags { display: block; margin-top: 4px; font: 400 12px system-ui, sans-serif; color: var(--muted); }
+  .scene.thumb { display: grid; grid-template-columns: 112px 1fr; gap: 12px; align-items: center; }
+  .scene img { width: 112px; height: 56px; object-fit: cover; border-radius: 6px; background: #111; }
+  .edit .hide { margin-left: auto; }
+  .edit .head { display: flex; align-items: center; gap: 8px; }
+  .edit.hidden .t { opacity: .5; } .edit.hidden .t::after { content: "  (hidden)"; font-weight: 400; color: var(--muted); }
+  .scene.current .stags { color: #3b3220; }
+  .edit { background: #2a303a; border-radius: 12px; padding: 10px 12px; margin-top: 6px; }
+  .edit .t { font-weight: 600; margin-bottom: 6px; }
+  .edit .tag button { background: none; border: 0; color: var(--muted); font-size: 15px; padding: 0 0 0 6px; }
+  .edit form { display: flex; gap: 6px; margin-top: 8px; }
+  .edit input { flex: 1; min-width: 0; font: 15px system-ui, sans-serif; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--neutral); background: #171b21; color: var(--text); }
+  .edit form button { background: var(--neutral); font-size: 14px; padding: 8px 12px; border-radius: 8px; }
   /* join screen */
   #join { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 2; }
   #join form { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 12px; }
@@ -89,15 +155,31 @@
 
   <details class="card" id="fac">
     <summary>Facilitator controls</summary>
-    <div class="label" style="margin-top:12px">Scene in the room</div>
-    <div class="scenes" id="scenes"></div>
-    <div class="label" style="margin-top:12px">Glenda</div>
-    <div class="row">
-      <button id="start">Start</button>
-      <button id="replay">Replay</button>
-      <button id="take">New take</button>
-      <button id="stop">Stop</button>
+    <div class="now">
+      <div class="what"><small>Now showing</small><b id="nowName">–</b><small id="nowNote"></small></div>
+      <button id="reset" title="Starts the scene again with its default settings">Reset scene</button>
     </div>
+
+    <div id="panel"></div>
+
+    <div id="glendaCtl" hidden>
+      <div class="label" style="margin-top:12px">Glenda</div>
+      <div class="row">
+        <button id="start">Start</button>
+        <button id="replay">Replay</button>
+        <button id="take">New take</button>
+        <button id="stop">Stop</button>
+      </div>
+    </div>
+
+    <div class="label" style="margin-top:16px">Choose a scene</div>
+    <div class="pickbar">
+      <input id="q" type="search" placeholder="Search rooms, scenes or tags" autocomplete="off">
+      <button id="editTags" type="button">Edit tags</button>
+    </div>
+    <div class="tags" id="tagbar"></div>
+    <div id="scenes"></div>
+    <datalist id="allTags"></datalist>
   </details>
 
   <footer>Whoever answers first decides what Glenda says next. Every answer is saved with the name of the person who gave it.</footer>
@@ -133,17 +215,225 @@
     send(id);
   });
 
-  // scene switching (facilitator): buttons come from scenes.json via the server
-  let sceneList = [];
+  const post = (url, body) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, name: me }) });
+  const remembered = (k, d) => { try { return JSON.parse(store.get(k)) ?? d; } catch (e) { return d; } };
+
+  // facilitator section stays open/closed as it was left
+  if (store.get('glenda.facOpen') === '1') $('fac').open = true;
+  $('fac').addEventListener('toggle', () => { store.set('glenda.facOpen', $('fac').open ? '1' : '0'); if ($('fac').open) loadScenes(); });
+
+  // ---------------------------------------------------------------- scene picker: groups, search, tags
+  // scenes.json entries: {id, label, url, group?, tags?}. Scenes without a group go under "Other".
+  let sceneList = [], current = null, editing = false;
+  const picked = new Set(remembered('glenda.tagFilter', []));
+  const groupOpen = remembered('glenda.groupOpen', {});                       // groups opened/closed by hand
+  const isOpen = (g, list) => g in groupOpen ? groupOpen[g] : !list.some((sc) => sc.library);   // library groups start folded
+  const norm = (t) => t.toLowerCase();
+
   async function loadScenes() {
     try { sceneList = (await (await fetch('/api/scenes', { cache: 'no-store' })).json()).scenes || []; } catch (e) { sceneList = []; }
-    $('scenes').innerHTML = sceneList.map((s) => `<button data-id="${esc(s.id)}">${esc(s.label)}</button>`).join('') || '<span style="color:var(--muted)">No scenes.json found</span>';
-    $('scenes').querySelectorAll('button').forEach((b) => b.addEventListener('click', async () => {
-      if (!me) return showJoin(true);
-      await fetch('/api/scene', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: b.dataset.id, name: me }) });
-    }));
+    drawPicker();
   }
-  $('fac').addEventListener('toggle', () => { if ($('fac').open) loadScenes(); });
+  function allTags() {
+    const m = new Map();
+    for (const sc of sceneList) for (const t of sc.tags || []) if (!m.has(norm(t))) m.set(norm(t), t);
+    return [...m.values()].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  }
+  function matches(sc) {
+    const tags = (sc.tags || []).map(norm);
+    for (const t of picked) if (!tags.includes(t)) return false;            // every chosen tag must be on the scene
+    const q = norm($('q').value.trim());
+    if (!q) return true;
+    return q.split(/\s+/).every((w) => [sc.label, sc.group || '', ...(sc.tags || [])].some((x) => norm(x).includes(w)));
+  }
+  function drawPicker() {
+    const tags = allTags();
+    for (const t of [...picked]) if (!tags.some((x) => norm(x) === t)) picked.delete(t);   // a tag nobody uses any more
+    $('tagbar').innerHTML = tags.map((t) => `<button type="button" class="tag${picked.has(norm(t)) ? ' on' : ''}" data-tag="${esc(norm(t))}">${esc(t)}</button>`).join('') +
+      (picked.size ? '<button type="button" class="tag clear" data-tag="">Clear</button>' : '');
+    $('allTags').innerHTML = tags.map((t) => `<option value="${esc(t)}">`).join('');
+    const shown = sceneList.filter((sc) => (editing || !sc.hidden) && matches(sc));
+    const groups = new Map();
+    for (const sc of shown) { const g = sc.group || 'Other'; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(sc); }
+    const filtering = picked.size || $('q').value.trim();
+    $('scenes').innerHTML = !sceneList.length ? '<div class="note">No scenes found (is scenes.json there?)</div>'
+      : !shown.length ? '<div class="note">No scenes match. Clear the search or tags.</div>'
+      : [...groups].map(([g, list]) => `<details class="sgroup" data-group="${esc(g)}"${filtering || isOpen(g, list) ? ' open' : ''}>
+          <summary><span>${esc(g)}</span><span style="margin-left:auto">${list.length}</span></summary>
+          ${list.map((sc) => editing ? editRow(sc) : sceneRow(sc)).join('')}
+        </details>`).join('');
+  }
+  function sceneRow(sc) {
+    const text = `<span>${esc(sc.label)}<span class="stags">${[sc.note, ...(sc.tags || [])].filter(Boolean).map(esc).join(' · ')}</span></span>`;
+    return `<button type="button" class="scene${sc.thumb ? ' thumb' : ''}${sc.id === current ? ' current' : ''}" data-id="${esc(sc.id)}">` +
+      (sc.thumb ? `<img src="${esc(sc.thumb)}" alt="" loading="lazy">` : '') + text + '</button>';
+  }
+  function editRow(sc) {
+    return `<div class="edit${sc.hidden ? ' hidden' : ''}" data-id="${esc(sc.id)}"><div class="head"><div class="t">${esc(sc.label)}</div>
+      <button type="button" class="tag hide" data-hide="${sc.hidden ? '0' : '1'}">${sc.hidden ? 'Show in list' : 'Hide from list'}</button></div>
+      <div class="tags">${(sc.tags || []).map((t, i) => `<span class="tag">${esc(t)}<button type="button" data-del="${i}" aria-label="Remove ${esc(t)}">×</button></span>`).join('') || '<span class="note">No tags yet</span>'}</div>
+      <form><input list="allTags" maxlength="30" placeholder="Add a tag"><button type="submit">Add</button></form></div>`;
+  }
+  async function saveTags(id, tags) {
+    if (!me) return showJoin(true);
+    try {
+      const r = await (await post('/api/scenetags', { id, tags })).json();
+      if (r.error) throw new Error(r.error);
+      sceneList.find((x) => x.id === id).tags = r.tags;
+    } catch (e) { alert('Could not save the tags: ' + e.message); }
+    drawPicker();
+  }
+  $('tagbar').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-tag]'); if (!b) return;
+    const t = b.dataset.tag;
+    if (!t) picked.clear(); else if (picked.has(t)) picked.delete(t); else picked.add(t);
+    store.set('glenda.tagFilter', JSON.stringify([...picked])); drawPicker();
+  });
+  $('q').addEventListener('input', drawPicker);
+  $('editTags').addEventListener('click', () => { editing = !editing; $('editTags').classList.toggle('on', editing); $('editTags').textContent = editing ? 'Done' : 'Edit tags'; drawPicker(); });
+  $('scenes').addEventListener('toggle', (e) => {                           // remember which groups are folded away
+    const d = e.target; if (!d.dataset || !d.dataset.group || picked.size || $('q').value.trim()) return;
+    groupOpen[d.dataset.group] = d.open;
+    store.set('glenda.groupOpen', JSON.stringify(groupOpen));
+  }, true);
+  $('scenes').addEventListener('click', async (e) => {
+    const hide = e.target.closest('[data-hide]');
+    if (hide) { if (!me) return showJoin(true);
+      const id = hide.closest('.edit').dataset.id, h = hide.dataset.hide === '1';
+      try { const r = await (await post('/api/scenehide', { id, hidden: h })).json(); if (r.error) throw new Error(r.error);
+        sceneList.find((x) => x.id === id).hidden = h; } catch (err) { alert('Could not save: ' + err.message); }
+      return drawPicker(); }
+    const del = e.target.closest('[data-del]');
+    if (del) { const id = del.closest('.edit').dataset.id, sc = sceneList.find((x) => x.id === id);
+      return saveTags(id, (sc.tags || []).filter((_, i) => i !== +del.dataset.del)); }
+    const b = e.target.closest('.scene'); if (!b) return;
+    if (!me) return showJoin(true);
+    current = b.dataset.id; drawPicker();                                   // show the choice straight away
+    await post('/api/scene', { id: b.dataset.id });
+  });
+  $('scenes').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const id = e.target.closest('.edit').dataset.id, sc = sceneList.find((x) => x.id === id), v = e.target.querySelector('input').value.trim();
+    if (v) saveTags(id, [...(sc.tags || []), v]);
+  });
+
+  // ---------------------------------------------------------------- reset scene (tap twice, so it can't happen by accident)
+  let armT = 0;
+  $('reset').addEventListener('click', async () => {
+    if (!me) return showJoin(true);
+    const b = $('reset');
+    if (!b.classList.contains('arm')) { b.classList.add('arm'); b.textContent = 'Tap again to reset'; clearTimeout(armT);
+      armT = setTimeout(() => { b.classList.remove('arm'); b.textContent = 'Reset scene'; }, 3000); return; }
+    clearTimeout(armT); b.classList.remove('arm'); b.textContent = 'Resetting…';
+    try { await post('/api/reset', {}); } catch (e) {}
+    setTimeout(() => { b.textContent = 'Reset scene'; }, 1200);
+  });
+
+  // ---------------------------------------------------------------- scene controls: built from what the live scene reports
+  let panelSig = null, panelVals = {};
+  const panoZoom = {};                   // tap-the-picture controls: 1 = whole room fits, 3 = zoomed in (scroll sideways)
+  const pending = {};                    // id -> {v, until}: what we just asked for, shown until the scene catches up
+  const sendT = {};
+  function setControl(id, value, now) {
+    if (!me) return showJoin(true);
+    pending[id] = { v: value, until: Date.now() + 2500 };
+    clearTimeout(sendT[id]);
+    const go = () => post('/api/control', { id, value }).catch(() => {});
+    if (now) go(); else sendT[id] = setTimeout(go, 120);                     // sliders: don't flood the server while dragging
+  }
+  const fmt = (c, v) => typeof v === 'number' ? (c.max <= 1 ? Math.round(v * 100) + '%' : String(v)) : '';
+  function ctlHtml(c) {
+    const name = `<span class="name">${esc(c.label || c.id)}${c.key ? `<span class="key">[${esc(c.key)}]</span>` : ''}${c.hint ? `<small>${esc(c.hint)}</small>` : ''}</span>`;
+    if (c.type === 'toggle') return `<div class="ctl">${name}<button type="button" class="sw" role="switch" aria-checked="false" aria-label="${esc(c.label)}" data-ctl="${esc(c.id)}"></button></div>`;
+    if (c.type === 'slider') return `<div class="ctl">${name}<span class="sl"><input type="range" data-ctl="${esc(c.id)}" min="${c.min ?? 0}" max="${c.max ?? 1}" step="${c.step ?? 0.01}" aria-label="${esc(c.label)}"><output></output></span></div>`;
+    if (c.type === 'select') return `<div class="ctl sel">${name}<div class="seg" data-ctl="${esc(c.id)}">${(c.options || []).map(([v, l]) => `<button type="button" data-v="${esc(v)}">${esc(l ?? v)}</button>`).join('')}</div></div>`;
+    if (c.type === 'button') return `<div class="ctl">${name}<button type="button" class="act" data-press="${esc(c.id)}">${esc(c.action || 'Go')}</button></div>`;
+    if (c.type === 'inventory') return `<div class="ctl sel">${name}<div class="segi">${(c.items || []).map((it) => `<button type="button" data-bagsel="${esc(it.id)}" data-bagid="${esc(c.id)}" class="${it.id === c.selected ? 'on' : ''}">${esc(it.name)}</button>`).join('')}</div></div>`;
+    if (c.type === 'turn') return `<div class="ctl txt"><b>${esc(c.label || 'Turn it')}</b><small>Turn it on the student tablet (play.html), or with the arrow keys on the room PC.</small></div>`;
+    if (c.type === 'text') return `<div class="ctl txt"><b>${esc(c.label || '')}</b>${c.hint ? `<small>${esc(c.hint)}</small>` : ''}</div>`;
+    if (c.type === 'code') return `<div class="ctl">${name}<form class="codef" data-code="${esc(c.id)}"><input autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="24" aria-label="${esc(c.label || 'Code')}"><button type="submit">Try</button></form></div>`;
+    if (c.type === 'pano') {
+      const z = panoZoom[c.id] || 1;
+      return `<div class="ctl pano">${name}<button type="button" class="act" data-pz="${esc(c.id)}">${z > 1 ? 'Fit' : 'Zoom'}</button>` +
+        `<div class="pwrap" data-pano="${esc(c.id)}"><div class="pin" style="width:${z * 100}%"><img src="${esc(c.src || '')}" alt="The room: tap a spot" draggable="false">` +
+        (c.markers || []).map((m) => `<span class="pm k-${esc(m.kind || 'go')}" style="left:${((+m.yaw || 0) / 360 + 0.5) * 100}%;top:${(0.5 - (+m.pitch || 0) / 180) * 100}%"><i></i>${m.label ? `<em>${esc(m.label)}</em>` : ''}</span>`).join('') +
+        `</div></div></div>`;
+    }
+    return '';
+  }
+  function drawPanel(p) {
+    const sig = p ? p.page + JSON.stringify(p.controls) : '';
+    if (sig !== panelSig) {
+      panelSig = sig;
+      const cs = p ? p.controls || [] : [];
+      const groups = new Map();
+      for (const c of cs) { const g = c.group || 'Controls'; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(c); }
+      const keep = {}, typed = {}, focus = document.activeElement && document.activeElement.closest && document.activeElement.closest('[data-code]');
+      $('panel').querySelectorAll('.pwrap').forEach((w) => { keep[w.dataset.pano] = w.scrollLeft; });           // keep zoom scroll and half-typed codes
+      $('panel').querySelectorAll('[data-code]').forEach((f) => { typed[f.dataset.code] = f.querySelector('input').value; });
+      $('panel').innerHTML = !p || !cs.length ? '<div class="note">No extra controls for this scene.</div>'
+        : [...groups].map(([g, list]) => `<div class="grp"><div class="label">${esc(g)}</div>${list.map(ctlHtml).join('')}</div>`).join('');
+      $('panel').querySelectorAll('.pwrap').forEach((w) => { if (keep[w.dataset.pano]) w.scrollLeft = keep[w.dataset.pano]; });
+      $('panel').querySelectorAll('[data-code]').forEach((f) => { const i = f.querySelector('input'); i.value = typed[f.dataset.code] || '';
+        if (focus && focus.dataset.code === f.dataset.code) i.focus(); });
+      $('panel')._defs = Object.fromEntries(cs.map((c) => [c.id, c]));
+    }
+    if (!p) return;
+    panelVals = p.values || {};
+    const defs = $('panel')._defs || {};
+    for (const el of $('panel').querySelectorAll('[data-ctl]')) {
+      const id = el.dataset.ctl, c = defs[id];
+      const pd = pending[id];
+      let v = panelVals[id];
+      if (pd) { if (Date.now() > pd.until || JSON.stringify(pd.v) === JSON.stringify(v)) delete pending[id]; else v = pd.v; }
+      if (c.type === 'toggle') el.setAttribute('aria-checked', v ? 'true' : 'false');
+      else if (c.type === 'slider') { if (document.activeElement !== el && typeof v === 'number') el.value = v; el.nextElementSibling.textContent = fmt(c, pd ? pd.v : +el.value); }
+      else if (c.type === 'select') el.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.v === String(v)));
+    }
+  }
+  $('panel').addEventListener('click', (e) => {
+    const sw = e.target.closest('.sw');
+    if (sw) { const id = sw.dataset.ctl, cur = id in pending ? pending[id].v : !!panelVals[id];
+      sw.setAttribute('aria-checked', String(!cur)); return setControl(id, !cur, true); }
+    const opt = e.target.closest('.seg button');
+    if (opt) { opt.parentNode.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b === opt));
+      return setControl(opt.parentNode.dataset.ctl, opt.dataset.v, true); }
+    const pr = e.target.closest('[data-press]');
+    if (pr) { if (!me) return showJoin(true); post('/api/control', { id: pr.dataset.press, press: true }).catch(() => {}); }
+  });
+  // tap-the-picture: a tap on the 360 image sends where it was (yaw/pitch in degrees, centre of the image = 0, 0)
+  $('panel').addEventListener('click', (e) => {
+    const pz = e.target.closest('[data-pz]');
+    if (pz) { const id = pz.dataset.pz, z = (panoZoom[id] || 1) > 1 ? 1 : 3; panoZoom[id] = z;
+      const w = $('panel').querySelector(`.pwrap[data-pano="${CSS.escape(id)}"]`);
+      if (w) { const mid = (w.scrollLeft + w.clientWidth / 2) / w.scrollWidth; w.firstElementChild.style.width = z * 100 + '%';
+        w.scrollLeft = mid * w.scrollWidth - w.clientWidth / 2; }
+      pz.textContent = z > 1 ? 'Fit' : 'Zoom'; return; }
+    const bs = e.target.closest('[data-bagsel]');
+    if (bs) { if (!me) return showJoin(true); bs.parentNode.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b === bs));
+      post('/api/control', { id: bs.dataset.bagid, value: { v: bs.dataset.bagsel, n: Date.now() + Math.random() } }).catch(() => {}); return; }
+    const im = e.target.closest('.pin img'); if (!im) return;
+    if (!me) return showJoin(true);
+    const b = im.getBoundingClientRect(), u = (e.clientX - b.left) / b.width, v = (e.clientY - b.top) / b.height;
+    const dot = document.createElement('span'); dot.className = 'tap'; dot.style.left = u * 100 + '%'; dot.style.top = v * 100 + '%';
+    im.parentNode.append(dot); setTimeout(() => dot.remove(), 700);
+    post('/api/control', { id: im.closest('[data-pano]').dataset.pano, value: { yaw: (u - 0.5) * 360, pitch: (0.5 - v) * 180, n: Date.now() + Math.random() } }).catch(() => {});
+  });
+  $('panel').addEventListener('submit', (e) => {
+    const f = e.target.closest('[data-code]'); if (!f) return;
+    e.preventDefault(); if (!me) return showJoin(true);
+    const i = f.querySelector('input'), v = i.value.trim(); if (!v) return;
+    post('/api/control', { id: f.dataset.code, value: { v, n: Date.now() + Math.random() } }).catch(() => {});
+    i.value = '';
+  });
+  $('panel').addEventListener('input', (e) => {
+    const el = e.target; if (el.type !== 'range') return;
+    const c = ($('panel')._defs || {})[el.dataset.ctl];
+    el.nextElementSibling.textContent = fmt(c, +el.value);
+    setControl(el.dataset.ctl, +el.value, false);
+  });
+  $('panel').addEventListener('change', (e) => { const el = e.target; if (el.type === 'range') setControl(el.dataset.ctl, +el.value, true); });
+
   loadScenes();
 
   async function poll() {
@@ -152,10 +442,14 @@
       const fresh = s.updated && (Date.now() / 1000 - s.updated) < 5;
       const st = s.stage || {};
       $('sceneName').textContent = (st.label || '–') + (st.connected ? '' : ' (stage.html not open)');
-      $('scenes').querySelectorAll('button').forEach((b) => b.classList.toggle('current', b.dataset.id === st.current));
+      $('nowName').textContent = st.label || '–';
+      $('nowNote').textContent = st.connected ? '' : 'The room page (stage.html) is not open';
+      if (st.current !== current) { current = st.current; if (!editing) drawPicker(); }
+      drawPanel(s.panel);
       const live = fresh || st.connected;
       $('conn').textContent = fresh ? 'Glenda connected' : st.connected ? 'room connected' : 'scene not running';
       $('conn').className = live ? 'ok' : 'bad';
+      $('glendaCtl').hidden = !fresh;                                       // Glenda's buttons only while Glenda is running
       if (fresh && typeof s.fps === 'number') {
         $('perf').textContent = `${s.fps} fps · ${s.res || ''}`;
         $('perf').className = s.fps >= 50 ? 'good' : s.fps >= 30 ? 'ok' : 'low';

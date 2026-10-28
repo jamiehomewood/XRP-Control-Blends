@@ -14,10 +14,11 @@
 <body>
 <!-- Load THIS page in the Igloo web layer (4096 x 2048). It shows whichever scene the facilitator picks on the
      remote (control.html -> Facilitator controls -> Scene). The scene list is scenes.json.
-     Open stage.html?scene=modern to start on a particular scene. -->
+     Open stage.html?scene=modern to start on a particular scene.
+     Reset scene (on the remote) reloads the current scene, so it starts again from its defaults. -->
 <div id="msg">Waiting for the scene server…</div>
 <script>
-  let shown = null, front = null;
+  let shown = null, front = null;   // shown = "scene id#load count": Reset scene raises the count, which reloads the scene
   const startScene = new URLSearchParams(location.search).get('scene');
   let first = true;
 
@@ -44,7 +45,7 @@
         d.current = startScene; d.url = d.scenes.find(s => s.id === startScene).url;
       }
       first = false;
-      if (d.current && d.url) show(d.current, d.url);
+      if (d.current && d.url) show(d.current + '#' + (d.load || 0), d.url);
     } catch (e) {
       if (!shown) document.getElementById('msg').textContent = 'Scene server not reachable – is start-server.bat running?';
     }
